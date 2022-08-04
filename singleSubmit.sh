@@ -19,4 +19,4 @@ python FBmain.py \
 --sigmoid=false \
 --temperature=1 \
 --leaky=false \
---output_dir=/home/brian.atkinson/Bayes/data
+--output_dir=/home/brian.atkinson/Bayes/data/

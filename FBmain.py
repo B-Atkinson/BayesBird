@@ -31,7 +31,7 @@ OUTPUT = 1
 PATH = hparams.output_dir + "-"+ hparams.model_type +  "-S" + str(hparams.seed)
 PATH, STATS = utils.build_directories(hparams,PATH)
 
-rng = torch.Generator(device=DEVICE)
+rng = torch.Generator()
 rng.manual_seed(hparams.seed)
 
 #save metadata for easy viewing 
@@ -61,7 +61,7 @@ def train(hparams, model):
     print(f'commencing training with {hparams.model_type} model')
     
     #train for num_episodes
-    for episode in tqdm(range(1,1+hparams.num_episodes)):
+    for episode in range(1,1+hparams.num_episodes):
         game.reset_game()
         
         agent_score, num_pipes = 0, 0
@@ -80,7 +80,8 @@ def train(hparams, model):
             #choose the appropriate model and get our action
             if hparams.model_type == 'PGNetwork':
                 p = model(frame_t)
-                action = ACTION_MAP['flap'] if torch.rand(1,dtype=float,generator=rng) < p else ACTION_MAP['noop']
+                sample = torch.rand(1,dtype=float,generator=rng).to(DEVICE)
+                action = ACTION_MAP['flap'] if sample < p else ACTION_MAP['noop']
             elif hparams.model_type == 'NoisyPG':
                 p = model(frame_t)
                 action = ACTION_MAP['flap'] if torch.rand(1,dtype=float,generator=rng) < p else ACTION_MAP['noop']
