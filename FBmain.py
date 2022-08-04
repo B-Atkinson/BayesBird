@@ -31,7 +31,6 @@ OUTPUT = 1
 PATH = hparams.output_dir + "-"+ hparams.model_type +  "-S" + str(hparams.seed)
 PATH, STATS = utils.build_directories(hparams,PATH)
 
-rng = np.random.default_rng(hparams.seed)
 rng = torch.Generator(device=DEVICE)
 rng.manual_seed(hparams.seed)
 

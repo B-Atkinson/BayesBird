@@ -36,7 +36,7 @@ def make_argparser():
     
     
     #hyperparameters
-    parser.add_argument('--batch_size', type=int, default=20,
+    parser.add_argument('--batch_size', type=int, default=50,
                         help="number of episodes to conduct rmsprop parameter updates over")
     parser.add_argument('--dropout', type=float, default=0,
                         help="likelihood of a neuron to be dropped, as a decimal from [0,1)")
@@ -63,7 +63,7 @@ def make_argparser():
                         help="if True, Adam will maximize the objective function. Not implemented for RMSprop")
     parser.add_argument('--model_type', type=str, default='PGNetwork',
                         help="can be PGNetwork or NoisyPG")
-    parser.add_argument('--num_episodes', type=int, default=10000,
+    parser.add_argument('--num_episodes', type=int, default=15000,
                         help="the number of episodes to train the agent on")
     parser.add_argument('--save_stats', type=int, default=200,
                         help="specifies the number of episodes to wait until saving network parameters, training summaries, and moves")
@@ -72,7 +72,7 @@ def make_argparser():
     
     
     #filepath arguments
-    parser.add_argument('--output_dir', type=str, default=os.path.join(os.getcwd(),'data/hyperSearch/'+'test_L2'),
+    parser.add_argument('--output_dir', type=str, default=os.path.join(os.getcwd(),'data/'),
                         help='a filepath to an existing directory to save to')
     
     # multi-gpu training arguments
