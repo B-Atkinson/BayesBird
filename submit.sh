@@ -1,5 +1,7 @@
 #!/bin/bash
 #SBATCH --mem=16G
+#SBATCH --partition=beards
+#SBATCH --gres=gpu:1
 #SBATCH --time=00-01:20:00
 
 . /etc/profile

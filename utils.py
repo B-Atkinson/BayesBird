@@ -6,7 +6,7 @@ def build_directories(hparams,PATH):
     '''Builds all the directories needed to save test results to disk. Returns the paths to the various directories'''
     #create directory to save results to
     try:
-        os.makedirs(os.path.dirname('../data/'+PATH),exist_ok=False)
+        os.makedirs(os.path.dirname(PATH),exist_ok=False)
     except FileExistsError:
         #create a unique name for the directory in case of overlapping paths
         print('directory already exists:',PATH)
