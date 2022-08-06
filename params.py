@@ -49,6 +49,8 @@ def make_argparser():
                         help="specify the base learning rate for the model")
     parser.add_argument('--L2', type=float, default=0,
                         help='amount to decay weights for L2 penalty in Adam')
+    parser.add_argument('--num_hiddens', type=int, default=2,
+                        help="number of hidden linear layers to use")     
     parser.add_argument('--optim', type=str, default='Adam',
                         help='String specifying the type of optimizer to be used.')
     parser.add_argument('--sigmoid', type=str2bool, default=False,

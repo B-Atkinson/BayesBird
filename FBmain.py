@@ -146,7 +146,12 @@ def train(hparams, model):
 
 #############   Main
 
-model = models.PGNetwork(GRID_SIZE,hparams.hidden,OUTPUT,hparams.leaky).to(DEVICE)
+model = models.PGNetwork(inputSize=GRID_SIZE,
+                        hiddenSize=hparams.hidden,
+                        outputSize=OUTPUT,
+                        leaky=hparams.leaky,
+                        temperature=hparams.temperature,
+                        nHiddenLyrs=hparams.num_hiddens).to(DEVICE)
 best_score, best_episode = train(hparams,model)
 print(f'\ntraining completed\nbest score: {best_score} achieved at episode {best_episode}')
 
