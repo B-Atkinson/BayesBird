@@ -17,9 +17,24 @@ from tqdm import tqdm
 
 
 hparams = params.get_hparams()
+#check if a CUDA GPU is available
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 LOADER_KWARGS = {'num_workers': hparams.workers, 'pin_memory': True} if torch.cuda.is_available() else {}
-print(f'use gpu:{torch.cuda.is_available()}   device:{DEVICE}')
+
+#if no CUDA GPU available, check for Apple M1-specific GPU called MPS
+if not torch.cuda.is_available():
+    DEVICE = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    if torch.backends.mps.is_available():
+        gpu='MPS'
+    else:
+        gpu=False
+else:
+    if torch.cuda.is_available():
+        gpu='CUDA'
+    else:
+        gpu=False
+
+print(f'gpu:{gpu}')
 
 #specified in ple/__init__.py lines 187-194
 WIDTH = 100     #downsample by half twice
@@ -58,7 +73,7 @@ def train(hparams, model):
     training_summaries = []
     best_score, best_episode = -1,0
     
-    print(f'commencing training with {hparams.model_type} model')
+    print(f'commencing training with {hparams.model_type} model',flush=True)
     
     #train for num_episodes
     for episode in range(1,1+hparams.num_episodes):

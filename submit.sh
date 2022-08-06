@@ -26,4 +26,5 @@ comment
 python FBmain.py \
 --seed=$SEED \
 --output_dir=$OUTPUT \
---num_episodes=$NUM
+--num_episodes=$NUM \
+--num_hiddens=$HIDDENS
