@@ -1,5 +1,5 @@
 #!/bin/bash
-OUTPUT=/home/brian.atkinson/Bayes/data/initTest
+OUTPUT=/home/brian.atkinson/Bayes/data/initTest/
 echo -e "saving experiment to:\n$OUTPUT\n"
 NUM_EPS=100000
 
