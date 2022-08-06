@@ -2,7 +2,7 @@
 #SBATCH --mem=16G
 #SBATCH --partition=beards
 #SBATCH --gres=gpu:1
-#SBATCH --time=00-09:00:00
+#SBATCH --time=00-01:00:00
 
 . /etc/profile
 

@@ -43,7 +43,7 @@ GRID_SIZE = WIDTH * HEIGHT
 ACTION_MAP = {'flap': K_w,'noop': None}
 REWARDDICT = {"positive":2, "loss":-5}
 OUTPUT = 1
-PATH = hparams.output_dir + "-"+ hparams.model_type +  "-S" + str(hparams.seed)
+PATH = hparams.output_dir + hparams.model_type +  "-S" + str(hparams.seed) + "-Layers" + str(hparams.num_hiddens) + "-"
 PATH, STATS = utils.build_directories(hparams,PATH)
 
 rng = torch.Generator()

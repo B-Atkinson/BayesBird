@@ -2,7 +2,7 @@
 OUTPUT=/home/brian.atkinson/Bayes/data/variableTest/
 echo -e "saving experiment to:\n$OUTPUT\n"
 NUM_EPS=20000
-HIDDENS=4
+HIDDENS=5
 
 JOB=1
 for SEED in 1
