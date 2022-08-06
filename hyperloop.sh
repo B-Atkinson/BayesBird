@@ -4,6 +4,14 @@ echo -e "saving experiment to:\n$OUTPUT\n"
 NUM_EPS=100000
 
 JOB=1
+for SEED in 1 2 3
+do
+    sbatch --job-name=$JOB \
+    --export=ALL,OUTPUT=$OUTPUT,NUM=$NUM_EPS,SEED=$SEED \
+    --output=/home/brian.atkinson/Bayes/text_files/InitialTest_$SEED.txt \
+    submit.sh
+    let JOB=JOB+1
+done
 <<comment
 for L2 in .0001
 do
@@ -35,12 +43,5 @@ do
     done
 done
 comment
-for SEED in 1 2 3
-do
-    sbatch --job-name=$JOB \
-                        --export=ALL,OUTPUT=$OUTPUT,NUM=$NUM_EPS,SEED=$SEED \
-                        --output=/home/brian.atkinson/Bayes/text_files/InitialTest_$SEED.txt \
-                        submit.sh
-                        let JOB=JOB+1
-done
+
 

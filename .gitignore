@@ -130,7 +130,7 @@ dmypy.json
 
 # text files and cache files
 **/*.txt
-**/**/*.pyc
+../*.pyc
 **/*.pyc
-**/__pycache__/*
-**/data/**
+__pycache__/**
+../data/**

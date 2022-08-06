@@ -19,7 +19,7 @@ from tqdm import tqdm
 hparams = params.get_hparams()
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 LOADER_KWARGS = {'num_workers': hparams.workers, 'pin_memory': True} if torch.cuda.is_available() else {}
-print(f'use gpu:{torch.cuda.is_available()}')
+print(f'use gpu:{torch.cuda.is_available()}   device:{DEVICE}')
 
 #specified in ple/__init__.py lines 187-194
 WIDTH = 100     #downsample by half twice
