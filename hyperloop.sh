@@ -1,16 +1,19 @@
 #!/bin/bash
-OUTPUT=/home/brian.atkinson/Bayes/data/initTest/
+OUTPUT=/home/brian.atkinson/Bayes/data/variableHiddens/
 echo -e "saving experiment to:\n$OUTPUT\n"
-NUM_EPS=100000
+NUM_EPS=20000
 
 JOB=1
-for SEED in 1 2 3
+for SEED in 1
 do
-    sbatch --job-name=$JOB \
-    --export=ALL,OUTPUT=$OUTPUT,NUM=$NUM_EPS,SEED=$SEED \
-    --output=/home/brian.atkinson/Bayes/text_files/InitialTest_$SEED.txt \
-    submit.sh
-    let JOB=JOB+1
+    for HIDDENS in 4 6 7
+    do
+        sbatch --job-name=$JOB \
+        --export=ALL,OUTPUT=$OUTPUT,NUM=$NUM_EPS,SEED=$SEED,HIDDENS=$HIDDENS \
+        --output=/home/brian.atkinson/Bayes/text_files/VariableTest_$SEED.HIDDENS$HIDDENS.txt \
+        submit.sh
+        let JOB=JOB+1
+    done
 done
 <<comment
 for L2 in .0001

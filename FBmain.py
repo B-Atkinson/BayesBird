@@ -17,9 +17,24 @@ from tqdm import tqdm
 
 
 hparams = params.get_hparams()
+#check if a CUDA GPU is available
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 LOADER_KWARGS = {'num_workers': hparams.workers, 'pin_memory': True} if torch.cuda.is_available() else {}
-print(f'use gpu:{torch.cuda.is_available()}   device:{DEVICE}')
+
+#if no CUDA GPU available, check for Apple M1-specific GPU called MPS
+if not torch.cuda.is_available():
+    DEVICE = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    if torch.backends.mps.is_available():
+        gpu='MPS'
+    else:
+        gpu=False
+else:
+    if torch.cuda.is_available():
+        gpu='CUDA'
+    else:
+        gpu=False
+
+print(f'gpu:{gpu}')
 
 #specified in ple/__init__.py lines 187-194
 WIDTH = 100     #downsample by half twice
@@ -28,7 +43,7 @@ GRID_SIZE = WIDTH * HEIGHT
 ACTION_MAP = {'flap': K_w,'noop': None}
 REWARDDICT = {"positive":2, "loss":-5}
 OUTPUT = 1
-PATH = hparams.output_dir + "-"+ hparams.model_type +  "-S" + str(hparams.seed)
+PATH = hparams.output_dir + hparams.model_type +  "-S" + str(hparams.seed) + "-Layers" + str(hparams.num_hiddens) + "-"
 PATH, STATS = utils.build_directories(hparams,PATH)
 
 rng = torch.Generator()
@@ -58,7 +73,7 @@ def train(hparams, model):
     training_summaries = []
     best_score, best_episode = -1,0
     
-    print(f'commencing training with {hparams.model_type} model')
+    print(f'commencing training with {hparams.model_type} model',flush=True)
     
     #train for num_episodes
     for episode in range(1,1+hparams.num_episodes):
@@ -146,7 +161,12 @@ def train(hparams, model):
 
 #############   Main
 
-model = models.PGNetwork(GRID_SIZE,hparams.hidden,OUTPUT,hparams.leaky).to(DEVICE)
+model = models.PGNetwork(inputSize=GRID_SIZE,
+                        hiddenSize=hparams.hidden,
+                        outputSize=OUTPUT,
+                        leaky=hparams.leaky,
+                        temperature=hparams.temperature,
+                        nHiddenLyrs=hparams.num_hiddens).to(DEVICE)
 best_score, best_episode = train(hparams,model)
 print(f'\ntraining completed\nbest score: {best_score} achieved at episode {best_episode}')
 
