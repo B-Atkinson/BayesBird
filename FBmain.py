@@ -34,8 +34,6 @@ else:
     else:
         gpu=False
 
-print(f'gpu:{gpu}')
-
 #specified in ple/__init__.py lines 187-194
 WIDTH = 100     #downsample by half twice
 HEIGHT = 72    #downsample by half twice
@@ -45,6 +43,10 @@ REWARDDICT = {"positive":2, "loss":-5}
 OUTPUT = 1
 PATH = hparams.output_dir + hparams.model_type +  "-S" + str(hparams.seed) + "-Layers" + str(hparams.num_hiddens) + "-"
 PATH, STATS = utils.build_directories(hparams,PATH)
+
+with open(os.path.join(PATH,'output.txt'),'w') as f:
+    f.write(f'gpu:{gpu}')
+print(f'gpu:{gpu}')
 
 rng = torch.Generator()
 rng.manual_seed(hparams.seed)
@@ -73,6 +75,8 @@ def train(hparams, model):
     training_summaries = []
     best_score, best_episode = -1,0
     
+    with open(os.path.join(PATH,'output.txt'),'a') as f:
+        f.write(f'commencing training with {hparams.model_type} model')
     print(f'commencing training with {hparams.model_type} model',flush=True)
     
     #train for num_episodes
@@ -95,7 +99,10 @@ def train(hparams, model):
             #choose the appropriate model and get our action
             if hparams.model_type == 'PGNetwork':
                 p = model(frame_t)
-                sample = torch.rand(1,dtype=float,generator=rng).to(DEVICE)
+                if gpu=="MPS":
+                    sample = torch.rand(1,dtype=torch.float32,generator=rng).to(DEVICE)
+                else:
+                    sample = torch.rand(1,dtype=float,generator=rng).to(DEVICE)
                 action = ACTION_MAP['flap'] if sample < p else ACTION_MAP['noop']
             elif hparams.model_type == 'NoisyPG':
                 p = model(frame_t)
@@ -168,6 +175,9 @@ model = models.PGNetwork(inputSize=GRID_SIZE,
                         temperature=hparams.temperature,
                         nHiddenLyrs=hparams.num_hiddens).to(DEVICE)
 best_score, best_episode = train(hparams,model)
+
+with open(os.path.join(PATH,'output.txt'),'a') as f:
+    f.write(f'\ntraining completed\nbest score: {best_score} achieved at episode {best_episode}')
 print(f'\ntraining completed\nbest score: {best_score} achieved at episode {best_episode}')
 
 with open(PATH+'/digest.txt','w') as f:

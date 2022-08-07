@@ -6,7 +6,7 @@ NUM_EPS=20000
 JOB=1
 for SEED in 1
 do
-    for HIDDENS in 4 6 7
+    for HIDDENS in 4
     do
         sbatch --job-name=$JOB \
         --export=ALL,OUTPUT=$OUTPUT,NUM=$NUM_EPS,SEED=$SEED,HIDDENS=$HIDDENS \
