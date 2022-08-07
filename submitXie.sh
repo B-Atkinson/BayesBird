@@ -6,10 +6,10 @@ HIDDENS=4
 JOB=0
 SEED=1
 
-for TEMP in 1e-5 1e-6 1e-7 1e-8 
+for TEMP in 100
 do
 
-screen -dms loop python FBmain.py \
+screen -dmS TEST python FBmain.py \
 --seed=$SEED \
 --output_dir=$OUTPUT \
 --num_episodes=$NUM \
