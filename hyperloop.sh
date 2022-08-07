@@ -1,16 +1,17 @@
 #!/bin/bash
-OUTPUT=/home/brian.atkinson/Bayes/data/variableHiddens/
+OUTPUT=/home/brian.atkinson/Bayes/data/tempTest/
 echo -e "saving experiment to:\n$OUTPUT\n"
 NUM_EPS=20000
+SEED=1
 
 JOB=1
-for SEED in 1
+for TEMP in 1e-5 1e-6 1e-7
 do
     for HIDDENS in 4
     do
         sbatch --job-name=$JOB \
-        --export=ALL,OUTPUT=$OUTPUT,NUM=$NUM_EPS,SEED=$SEED,HIDDENS=$HIDDENS \
-        --output=/home/brian.atkinson/Bayes/text_files/VariableTest_$SEED.HIDDENS$HIDDENS.txt \
+        --export=ALL,OUTPUT=$OUTPUT,NUM=$NUM_EPS,SEED=$SEED,HIDDENS=$HIDDENS,TEMP=$TEMP \
+        --output=/home/brian.atkinson/Bayes/text_files/TempTest_$SEED.HIDDENS$HIDDENS.TEMP$TEMP.txt \
         submit.sh
         let JOB=JOB+1
     done

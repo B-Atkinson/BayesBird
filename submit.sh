@@ -2,7 +2,7 @@
 #SBATCH --mem=16G
 #SBATCH --partition=beards
 #SBATCH --gres=gpu:1
-#SBATCH --time=00-01:00:00
+#SBATCH --time=00-02:00:00
 
 . /etc/profile
 
@@ -27,4 +27,7 @@ python FBmain.py \
 --seed=$SEED \
 --output_dir=$OUTPUT \
 --num_episodes=$NUM \
---num_hiddens=$HIDDENS
+--num_hiddens=$HIDDENS \
+--temperature=$TEMP \
+--L2=.0001 \
+--sigmoid=true
