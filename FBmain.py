@@ -45,7 +45,7 @@ PATH = hparams.output_dir + hparams.model_type +  "-S" + str(hparams.seed) + "-L
 PATH, STATS = utils.build_directories(hparams,PATH)
 
 with open(os.path.join(PATH,'output.txt'),'w') as f:
-    f.write(f'gpu:{gpu}')
+    f.write(f'gpu:{gpu}\n')
 print(f'gpu:{gpu}')
 
 rng = torch.Generator()
@@ -76,7 +76,7 @@ def train(hparams, model):
     best_score, best_episode = -1,0
     
     with open(os.path.join(PATH,'output.txt'),'a') as f:
-        f.write(f'commencing training with {hparams.model_type} model')
+        f.write(f'commencing training with {hparams.model_type} model\n')
     print(f'commencing training with {hparams.model_type} model',flush=True)
     
     #train for num_episodes
@@ -172,8 +172,8 @@ model = models.PGNetwork(hparams, inputSize=GRID_SIZE, outputSize=OUTPUT).to(DEV
 best_score, best_episode = train(hparams,model)
 
 with open(os.path.join(PATH,'output.txt'),'a') as f:
-    f.write(f'\ntraining completed\nbest score: {best_score} achieved at episode {best_episode}')
+    f.write(f'\ntraining completed\nbest score: {best_score} achieved at episode {best_episode}\n')
 print(f'\ntraining completed\nbest score: {best_score} achieved at episode {best_episode}')
 
 with open(PATH+'/digest.txt','w') as f:
-    f.write(f'best episode:{best_episode}\nbest score: {best_score}')
+    f.write(f'best episode:{best_episode}\nbest score: {best_score}\n')

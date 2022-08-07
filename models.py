@@ -18,10 +18,10 @@ class PGNetwork(torch.nn.Module):
 
         self.layers = torch.nn.ModuleList()
         self.layers.append( torch.nn.Linear(inputSize, self.hiddenSize) )
-        if self.nHiddenLyrs <= 1:
+        if self.num_layers <= 1:
             self.layers.append( torch.nn.Linear(self.hiddenSize, outputSize) )
         else:
-            for lyr in range(2,self.nHiddenLyrs+1):
+            for lyr in range(2,self.num_layers+1):
                 self.layers.append( torch.nn.Linear(self.hiddenSize, self.hiddenSize) )
             self.layers.append( torch.nn.Linear(self.hiddenSize, outputSize) )
         
