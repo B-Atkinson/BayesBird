@@ -5,7 +5,7 @@ NUM_EPS=20000
 SEED=1
 
 JOB=1
-for TEMP in 1e-5 1e-6 1e-7
+for TEMP in 1e-8
 do
     for HIDDENS in 4
     do

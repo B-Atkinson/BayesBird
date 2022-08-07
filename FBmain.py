@@ -168,12 +168,7 @@ def train(hparams, model):
 
 #############   Main
 
-model = models.PGNetwork(inputSize=GRID_SIZE,
-                        hiddenSize=hparams.hidden,
-                        outputSize=OUTPUT,
-                        leaky=hparams.leaky,
-                        temperature=hparams.temperature,
-                        nHiddenLyrs=hparams.num_hiddens).to(DEVICE)
+model = models.PGNetwork(hparams, inputSize=GRID_SIZE, outputSize=OUTPUT).to(DEVICE)
 best_score, best_episode = train(hparams,model)
 
 with open(os.path.join(PATH,'output.txt'),'a') as f:

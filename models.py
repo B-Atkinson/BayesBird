@@ -3,25 +3,29 @@ import torch.nn.functional as F
 import numpy as np
 import math
 
+
 class PGNetwork(torch.nn.Module):
     '''A neural network to produce a probability of going up.'''
-    def __init__(self, inputSize, hiddenSize, outputSize, leaky=False, sigmoid=False, temperature=1,nHiddenLyrs=2):
+    def __init__(self, hparams, inputSize, outputSize):
         super(PGNetwork,self).__init__()
         #define layers for probability
-        self.layers = torch.nn.ModuleList()
-        self.layers.append( torch.nn.Linear(inputSize, hiddenSize) )
-        if nHiddenLyrs <= 1:
-            self.layers.append( torch.nn.Linear(hiddenSize, outputSize) )
-        else:
-            for lyr in range(2,nHiddenLyrs+1):
-                self.layers.append( torch.nn.Linear(hiddenSize, hiddenSize) )
-            self.layers.append( torch.nn.Linear(hiddenSize, outputSize) )
-        
-        self.leaky = leaky
-        self.sigmoid = sigmoid
-        self.num_layers = nHiddenLyrs
-        self.temperature = torch.tensor(temperature if temperature > 0 else 1e-6, dtype=float)
+        self.leaky = hparams.leaky
+        self.sigmoid = hparams.sigmoid
+        self.num_layers = hparams.num_hiddens
+        self.hiddenSize = hparams.hidden
+        self.temperature = torch.tensor(hparams.temperature if hparams.temperature > 0 else 1e-6, dtype=float)
         self.activations = {False:F.relu, True:F.leaky_relu}
+
+        self.layers = torch.nn.ModuleList()
+        self.layers.append( torch.nn.Linear(inputSize, self.hiddenSize) )
+        if self.nHiddenLyrs <= 1:
+            self.layers.append( torch.nn.Linear(self.hiddenSize, outputSize) )
+        else:
+            for lyr in range(2,self.nHiddenLyrs+1):
+                self.layers.append( torch.nn.Linear(self.hiddenSize, self.hiddenSize) )
+            self.layers.append( torch.nn.Linear(self.hiddenSize, outputSize) )
+        
+        
         print(len(self.layers),flush=True)
 
     def forward(self,x):
