@@ -22,6 +22,8 @@ class PGNetwork(torch.nn.Module):
         self.sigmoid = hparams.sigmoid
         self.num_layers = hparams.num_hiddens
         self.hiddenSize = hparams.hidden
+        self.outputSize = outputSize
+        self.softmax = hparams.softmax
         self.temperature = torch.tensor(hparams.temperature if hparams.temperature > 0 else 1e-8, dtype=float)
         self.activations = {False:F.relu, True:F.leaky_relu}    #allows user to specify hidden activations
         self.layers = torch.nn.ModuleList()                     #this will store the layers of the network
@@ -44,6 +46,11 @@ class PGNetwork(torch.nn.Module):
         p = self.layers[self.num_layers](x)
         if self.sigmoid:
             p = torch.sigmoid(p / self.temperature)
+        elif self.softmax:
+            if self.outputSize > 1:
+                p = F.softmax(p)
+            else:
+                raise Exception('Softmax requires output size >1 to be useful')
         return p
         
 class NoisyPG(torch.nn.Module):

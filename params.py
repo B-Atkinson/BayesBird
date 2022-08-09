@@ -36,7 +36,7 @@ def make_argparser():
     
     
     #hyperparameters
-    parser.add_argument('--batch_size', type=int, default=50,
+    parser.add_argument('--batch_size', type=int, default=10,
                         help="number of episodes to conduct rmsprop parameter updates over")
     parser.add_argument('--dropout', type=float, default=0,
                         help="likelihood of a neuron to be dropped, as a decimal from [0,1)")
@@ -47,14 +47,16 @@ def make_argparser():
                         help="if True, use Leaky ReLu activation, else use ReLU")
     parser.add_argument("--learning_rate", type=float, default=1e-2,
                         help="specify the base learning rate for the model")
-    parser.add_argument('--L2', type=float, default=0,
+    parser.add_argument('--L2', type=float, default=1e-3,
                         help='amount to decay weights for L2 penalty in Adam')
     parser.add_argument('--num_hiddens', type=int, default=2,
                         help="number of hidden linear layers to use")     
     parser.add_argument('--optim', type=str, default='Adam',
                         help='String specifying the type of optimizer to be used.')
-    parser.add_argument('--sigmoid', type=str2bool, default=False,
+    parser.add_argument('--sigmoid', type=str2bool, default=True,
                         help="if True, uses sigmoid activation for output layer of network")
+    parser.add_argument('--softmax', type=str2bool, default=False,
+                        help="if True, uses softmax activation for output layer of network")
     parser.add_argument("--temperature", type=float, default=1,
                         help="the temperature value used to modify input to the sigmoid activation \
                             function. must be greater than 0")
@@ -74,7 +76,7 @@ def make_argparser():
     
     
     #filepath arguments
-    parser.add_argument('--output_dir', type=str, default=os.path.join(os.getcwd(),'data/'),
+    parser.add_argument('--output_dir', type=str, default=os.path.join(os.getcwd(),'data/debug/'),
                         help='a filepath to an existing directory to save to')
     
     # multi-gpu training arguments

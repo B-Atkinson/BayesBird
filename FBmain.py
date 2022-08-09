@@ -40,7 +40,7 @@ HEIGHT = 72    #downsample by half twice
 GRID_SIZE = WIDTH * HEIGHT
 ACTION_MAP = {'flap': K_w,'noop': None}
 REWARDDICT = {"positive":2, "loss":-5}
-OUTPUT = 1
+OUTPUT = 2 if hparams.softmax else 1
 PATH = hparams.output_dir + hparams.model_type +  "-S" + str(hparams.seed) + "-Layers" + str(hparams.num_hiddens) + "-"
 PATH, STATS = utils.build_directories(hparams,PATH)
 
@@ -99,11 +99,12 @@ def train(hparams, model):
             #choose the appropriate model and get our action
             if hparams.model_type == 'PGNetwork':
                 p = model(frame_t)
+                p_up = p[0].clone().to(DEVICE) if hparams.softmax else p.clone().to(DEVICE)
                 if gpu=="MPS":
                     sample = torch.rand(1,dtype=torch.float32,generator=rng).to(DEVICE)
                 else:
                     sample = torch.rand(1,dtype=float,generator=rng).to(DEVICE)
-                action = ACTION_MAP['flap'] if sample < p else ACTION_MAP['noop']
+                action = ACTION_MAP['flap'] if sample < p_up else ACTION_MAP['noop']
             elif hparams.model_type == 'NoisyPG':
                 p = model(frame_t)
                 action = ACTION_MAP['flap'] if torch.rand(1,dtype=float,generator=rng) < p else ACTION_MAP['noop']
@@ -120,7 +121,7 @@ def train(hparams, model):
             frames.append(frame_t)
             actions.append(1 if action==K_w else 0) #flaps stored as 1, no-flap stored as 0
             rewards.append(reward)
-            probs.append(p)
+            probs.append(p_up)
         #end of game play for episode
             
         #update performance variables
@@ -136,7 +137,7 @@ def train(hparams, model):
         
         #calculate loss and do backprop
         if hparams.model_type == 'PGNetwork':
-            prob_t = torch.stack(probs)             #create tensor of network outputs while preserving computational graph
+            prob_t = torch.stack(probs)         #create tensor of network outputs while preserving computational graph
             logp = torch.sum(torch.log(prob_t))     #add all log probabilities in the episode
             loss = torch.div(torch.mul(discounted_reward,logp), hparams.batch_size) #divide by number of samples (i.e. episodes in batch)
         elif hparams.model_type == 'NoisyPG':

@@ -39,5 +39,15 @@ def processScreen(obs):
        only using the 0th channel of the original image.'''
     obs = obs[::2,:400:2,0]
     obs = obs[::2,::2]
+    col,row =np.shape(obs)
+    for i in range(col):
+        for j in range(row):
+            #background pixels only have value on channel 0, and the value is 33
+            if (obs[i,j]==33):
+                obs[i,j] = 0
+            elif (obs[i,j]==0):
+                pass                
+            else:
+                obs[i,j] = 1
     return obs.astype(np.float).ravel()
 
