@@ -86,3 +86,32 @@ class NoisyPG(torch.nn.Module):
         if self.sigmoid:
             p = torch.sigmoid(p / self.temperature)
         return p
+
+class CNN_PG(torch.nn.Module):
+    def __init__(self,hparams,inputWidth,inputHeight,outputSize):
+        super(CNN_PG,self).__init__()
+        self.leaky = hparams.leaky
+        self.sigmoid = hparams.sigmoid
+        self.num_layers = hparams.num_hiddens
+        self.hiddenSize = hparams.hidden
+        self.outputSize = outputSize
+        self.softmax = hparams.softmax
+        self.temperature = torch.tensor(hparams.temperature if hparams.temperature > 0 else 1e-8, dtype=float)
+        self.activations = {False:F.relu, True:F.leaky_relu}    #allows user to specify hidden activations
+        self.layers = torch.nn.ModuleList()                     #this will store the layers of the network
+
+        # self.layers.append( torch.nn.Linear(inputSize, self.hiddenSize) )
+        # if self.num_layers <= 1:
+        #     self.layers.append( torch.nn.Linear(self.hiddenSize, outputSize) )
+        # else:
+        #     for lyr in range(2,self.num_layers+1):
+        #         self.layers.append( torch.nn.Linear(self.hiddenSize, self.hiddenSize) )
+        #     self.layers.append( torch.nn.Linear(self.hiddenSize, outputSize) )         
+        # print(len(self.layers),flush=True)
+
+        for lyr in range(self.num_layers):
+            #track width/height with each layer
+            self.layers.append(torch.nn.Sequential(torch.nn.Conv2d(1, 3, kernel_size=7, stride=3), torch.nn.MaxPool2d(2,2)))
+        self.layers.append(torch.nn.Sequential(torch.nn.Linear(7 * 7 * 64, X), torch.nn.ReLU(inplace=True)))
+        self.layers.append(torch.nn.Sequential(torch.nn.Linear(X, self.outputSize), torch.sigmoid(inplace=True)))
+    

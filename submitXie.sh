@@ -1,6 +1,6 @@
 #!/bin/bash
 conda activate torch
-OUTPUT=/Users/student/Documents/brian/data/LinearNormTest/
+OUTPUT=/Users/student/Documents/brian/data/CNNTest/
 NUM=20000
 JOB=0
 SEED=1
