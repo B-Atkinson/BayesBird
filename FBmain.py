@@ -34,6 +34,9 @@ else:
     else:
         gpu=False
 
+lastAct = "Sig" if hparams.sigmoid else "Linear"
+lastAct = "Softmax" if hparams.softmax else lastAct
+
 #specified in ple/__init__.py lines 187-194
 WIDTH = 100     #downsample by half twice
 HEIGHT = 72    #downsample by half twice
@@ -41,7 +44,7 @@ GRID_SIZE = WIDTH * HEIGHT
 ACTION_MAP = {'flap': K_w,'noop': None}
 REWARDDICT = {"positive":2, "loss":-5}
 OUTPUT = 2 if hparams.softmax else 1
-PATH = hparams.output_dir + hparams.model_type +  "-S" + str(hparams.seed) + "-Layers" + str(hparams.num_hiddens) + "-"
+PATH = hparams.output_dir + hparams.model_type +  f"-S:{hparams.seed}" + f"-Layers:{hparams.num_hiddens}" + f"-leaky:{hparams.leaky}" + f"-OutputAct:{lastAct}"
 PATH, STATS = utils.build_directories(hparams,PATH)
 
 with open(os.path.join(PATH,'output.txt'),'w') as f:
@@ -130,6 +133,8 @@ def train(hparams, model):
             # pickle.dump(model, open(MODEL_NAME  + str(episode) + '.p', 'wb'))
             best_score = num_pipes
             best_episode = episode
+            with open(os.path.join(PATH,'output.txt'),'a') as f:
+                f.write(f'\nnew high score:{best_score} episode:{best_episode}\n')
         training_summaries.append( (episode, num_pipes) )
         
         stacked_rewards = np.vstack(rewards)

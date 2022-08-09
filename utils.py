@@ -12,14 +12,8 @@ def build_directories(hparams,PATH):
         print('directory already exists:',PATH)
         from time import time
         PATH += "_"+str(time())[-4:]
-
-    # MODEL_NAME =  PATH + "/pickles/"
-    # ACTIVATIONS = PATH + "/activations/"
     STATS = PATH+"/stats.csv"
-
     os.makedirs(os.path.dirname(PATH+'/metadata.txt'), exist_ok=True)
-    # os.makedirs(os.path.dirname(MODEL_NAME), exist_ok=True)
-    # os.makedirs(os.path.dirname(ACTIVATIONS), exist_ok=True)
     print('Saving to: ' + PATH,flush=True)
     return PATH, STATS
     

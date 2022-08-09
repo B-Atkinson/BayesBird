@@ -36,7 +36,7 @@ def make_argparser():
     
     
     #hyperparameters
-    parser.add_argument('--batch_size', type=int, default=10,
+    parser.add_argument('--batch_size', type=int, default=20,
                         help="number of episodes to conduct rmsprop parameter updates over")
     parser.add_argument('--dropout', type=float, default=0,
                         help="likelihood of a neuron to be dropped, as a decimal from [0,1)")
@@ -53,7 +53,7 @@ def make_argparser():
                         help="number of hidden linear layers to use")     
     parser.add_argument('--optim', type=str, default='Adam',
                         help='String specifying the type of optimizer to be used.')
-    parser.add_argument('--sigmoid', type=str2bool, default=True,
+    parser.add_argument('--sigmoid', type=str2bool, default=False,
                         help="if True, uses sigmoid activation for output layer of network")
     parser.add_argument('--softmax', type=str2bool, default=False,
                         help="if True, uses softmax activation for output layer of network")

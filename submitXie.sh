@@ -1,11 +1,11 @@
 #!/bin/bash
 conda activate torch
-OUTPUT=/Users/student/Documents/brian/data/NormTest/
+OUTPUT=/Users/student/Documents/brian/data/LinearNormTest/
 NUM=20000
 JOB=0
 SEED=1
 
-for HIDDENS in 3
+for HIDDENS in 3 4 5
 do
 
 screen -dm python FBmain.py \
@@ -13,9 +13,11 @@ screen -dm python FBmain.py \
 --output_dir=$OUTPUT \
 --num_episodes=$NUM \
 --num_hiddens=$HIDDENS \
---temperature=1e-7 \
+--batch_size=30 \
 --L2=.0001 \
---sigmoid=true \
+--leaky=true \
+--sigmoid=false \
+--temperature=1e-7 \
 --softmax=false
 
 let JOB=JOB+1
