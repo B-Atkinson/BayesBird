@@ -142,3 +142,4 @@ ple/games/base/__pycache__/pygamewrapper.cpython-39.pyc
 ple/games/doom/__pycache__/__init__.cpython-39.pyc
 ple/games/doom/__pycache__/doom.cpython-39.pyc
 ple/games/flappybird/__pycache__/__init__.cpython-39.pyc
+ple/games/__pycache__/**
