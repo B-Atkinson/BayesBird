@@ -132,7 +132,7 @@ dmypy.json
 **/*.txt
 ../*.pyc
 **/*.pyc
-**/__pycache__/**
+BayesBird/**/__pycache__/**
 ../data/**
 data/PGNetwork-S1-Layers2-/bestFrames.p
 */ple/games/__pycache__/**
