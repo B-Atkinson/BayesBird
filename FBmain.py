@@ -95,20 +95,24 @@ def train(hparams, model):
             #retrieve current game state and process into tensor
             currentFrame = game.getScreenRGB()
             frame_np = utils.processScreen(currentFrame)
-            combined_np = np.subtract(frame_np,lastFrame).ravel()          #combine the current frame with the last frame, and flatten
-            frame_t = torch.from_numpy(combined_np).float().to(DEVICE)     #convert to a tensor
-            lastFrame = np.copy(frame_np)
-            stack_t = torch.stack([torch.from_numpy(frame_np).float(),torch.from_numpy(lastFrame).float()],0).to(DEVICE)
             
             #choose the appropriate model and get our action
             if hparams.model_type == 'PGNetwork':
+                combined_np = np.subtract(frame_np,lastFrame).ravel()          #combine the current frame with the last frame, and flatten
+                frame_t = torch.from_numpy(combined_np).float().to(DEVICE)     #convert to a tensor
                 p = model(frame_t)
             elif hparams.model_type == 'NoisyPG':
+                combined_np = np.subtract(frame_np,lastFrame).ravel()          #combine the current frame with the last frame, and flatten
+                frame_t = torch.from_numpy(combined_np).float().to(DEVICE)     #convert to a tensor
                 p = model(frame_t)
             elif hparams.model_type == 'CNN_PG':
+                stack_t = torch.stack([torch.from_numpy(frame_np).float(),torch.from_numpy(lastFrame).float()],0).to(DEVICE)
                 p = model(stack_t)
             else:
                 raise Exception('Unsupported model type.')         
+
+            #update last frame array
+            lastFrame = np.copy(frame_np)
 
             #get the action to take
             p_up = p[0].clone().to(DEVICE) if hparams.softmax else p.clone().to(DEVICE)
@@ -125,10 +129,11 @@ def train(hparams, model):
             #record data for this step
             if reward > 0:
                 num_pipes += 1
-            frames.append(frame_t)
+            frames.append(currentFrame)
             actions.append(1 if action==K_w else 0) #flaps stored as 1, no-flap stored as 0
             rewards.append(reward)
             probs.append(p_up)
+
         #end of game play for episode
             
         #update performance variables
