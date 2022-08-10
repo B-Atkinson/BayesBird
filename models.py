@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 import numpy as np
-import math
+from math import floor
 
 
 class PGNetwork(torch.nn.Module):
@@ -88,7 +88,7 @@ class NoisyPG(torch.nn.Module):
         return p
 
 class CNN_PG(torch.nn.Module):
-    def __init__(self,hparams,inputWidth,inputHeight,outputSize):
+    def __init__(self,hparams,w,h,outputSize):
         super(CNN_PG,self).__init__()
         self.leaky = hparams.leaky
         self.sigmoid = hparams.sigmoid
@@ -98,20 +98,28 @@ class CNN_PG(torch.nn.Module):
         self.softmax = hparams.softmax
         self.temperature = torch.tensor(hparams.temperature if hparams.temperature > 0 else 1e-8, dtype=float)
         self.activations = {False:F.relu, True:F.leaky_relu}    #allows user to specify hidden activations
-        self.layers = torch.nn.ModuleList()                     #this will store the layers of the network
+        
+        self.conv1 = torch.nn.Conv2d(in_channels=2,out_channels=3, kernel_size=7, padding=2, stride=1, dilation=1)
+        w,h = self.__outSize(w,7,padLength=2), self.__outSize(h,7,padLength=2)
 
-        # self.layers.append( torch.nn.Linear(inputSize, self.hiddenSize) )
-        # if self.num_layers <= 1:
-        #     self.layers.append( torch.nn.Linear(self.hiddenSize, outputSize) )
-        # else:
-        #     for lyr in range(2,self.num_layers+1):
-        #         self.layers.append( torch.nn.Linear(self.hiddenSize, self.hiddenSize) )
-        #     self.layers.append( torch.nn.Linear(self.hiddenSize, outputSize) )         
-        # print(len(self.layers),flush=True)
+        self.pool = torch.nn.MaxPool2d(kernel_size=2,padding=0,stride=1,dilation=1)
+        w,h = self.__outSize(w,2,padLength=0), self.__outSize(h,2,padLength=0)
+        
+        self.conv2 = torch.nn.Conv2d(in_channels=3,out_channels=6, kernel_size=5, padding=2, stride=1, dilation=1)
+        w,h = self.__outSize(w,5,padLength=2), self.__outSize(h,5,padLength=2)
 
-        for lyr in range(self.num_layers):
-            #track width/height with each layer
-            self.layers.append(torch.nn.Sequential(torch.nn.Conv2d(1, 3, kernel_size=7, stride=3), torch.nn.MaxPool2d(2,2)))
-        self.layers.append(torch.nn.Sequential(torch.nn.Linear(7 * 7 * 64, X), torch.nn.ReLU(inplace=True)))
-        self.layers.append(torch.nn.Sequential(torch.nn.Linear(X, self.outputSize), torch.sigmoid(inplace=True)))
-    
+        self.linear1 = torch.nn.Linear(6*w*h, 100)
+        self.linear2 = torch.nn.Linear(100,50)
+        self.linear3 = torch.nn.Linear(50,outputSize)
+
+    def forward(self,x):
+        x = self.activations[self.leaky](self.conv1(x))
+        x = self.pool(x)
+        x = self.activations[self.leaky](self.conv2(x))
+        x = self.activations[self.leaky](self.linear1(torch.flatten(x)))
+        x = self.activations[self.leaky](self.linear2(x))
+        x = torch.sigmoid(self.linear3(x))
+        return x
+        
+    def __outSize(self, inputSize, kSize, padLength=0, stride=1, dilation=1):
+        return floor( ((inputSize + 2*padLength - dilation * (kSize - 1) - 1) / stride) + 1 )

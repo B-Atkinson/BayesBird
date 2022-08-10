@@ -88,31 +88,35 @@ def train(hparams, model):
         
         agent_score, num_pipes = 0, 0
         frames, actions, rewards, probs = [], [], [], []
-        lastFrame = np.zeros([GRID_SIZE])
+        lastFrame = np.zeros([72,100],dtype=float)
         
         #play a single game
         while not game.game_over():
             #retrieve current game state and process into tensor
             currentFrame = game.getScreenRGB()
             frame_np = utils.processScreen(currentFrame)
-            combined_np = np.subtract(frame_np,lastFrame)    #combine the current frame with the last frame, and flatten
+            combined_np = np.subtract(frame_np,lastFrame).ravel()          #combine the current frame with the last frame, and flatten
             frame_t = torch.from_numpy(combined_np).float().to(DEVICE)     #convert to a tensor
             lastFrame = np.copy(frame_np)
+            stack_t = torch.stack([torch.from_numpy(frame_np).float(),torch.from_numpy(lastFrame).float()],0).to(DEVICE)
             
             #choose the appropriate model and get our action
             if hparams.model_type == 'PGNetwork':
                 p = model(frame_t)
-                p_up = p[0].clone().to(DEVICE) if hparams.softmax else p.clone().to(DEVICE)
-                if gpu=="MPS":
-                    sample = torch.rand(1,dtype=torch.float32,generator=rng).to(DEVICE)
-                else:
-                    sample = torch.rand(1,dtype=float,generator=rng).to(DEVICE)
-                action = ACTION_MAP['flap'] if sample < p_up else ACTION_MAP['noop']
             elif hparams.model_type == 'NoisyPG':
                 p = model(frame_t)
-                action = ACTION_MAP['flap'] if torch.rand(1,dtype=float,generator=rng) < p else ACTION_MAP['noop']
+            elif hparams.model_type == 'CNN_PG':
+                p = model(stack_t)
             else:
-                raise Exception('Unsupported model type.')            
+                raise Exception('Unsupported model type.')         
+
+            #get the action to take
+            p_up = p[0].clone().to(DEVICE) if hparams.softmax else p.clone().to(DEVICE)
+            if gpu=="MPS":
+                sample = torch.rand(1,dtype=torch.float32,generator=rng).to(DEVICE)
+            else:
+                sample = torch.rand(1,dtype=float,generator=rng).to(DEVICE)
+            action = ACTION_MAP['flap'] if sample < p_up else ACTION_MAP['noop']   
             
             #take the action
             reward = game.act(action)
@@ -130,7 +134,6 @@ def train(hparams, model):
         #update performance variables
         if num_pipes > best_score:
             pickle.dump(frames,open(PATH+'/bestFrames.p','wb'))
-            # pickle.dump(model, open(MODEL_NAME  + str(episode) + '.p', 'wb'))
             best_score = num_pipes
             best_episode = episode
             with open(os.path.join(PATH,'output.txt'),'a') as f:
@@ -141,14 +144,9 @@ def train(hparams, model):
         discounted_reward = torch.tensor(utils.discount_rewards(stacked_rewards, hparams.gamma)).float().to(DEVICE) 
         
         #calculate loss and do backprop
-        if hparams.model_type == 'PGNetwork':
-            prob_t = torch.stack(probs)         #create tensor of network outputs while preserving computational graph
-            logp = torch.sum(torch.log(prob_t))     #add all log probabilities in the episode
-            loss = torch.div(torch.mul(discounted_reward,logp), hparams.batch_size) #divide by number of samples (i.e. episodes in batch)
-        elif hparams.model_type == 'NoisyPG':
-            ...
-        else:
-            raise Exception('Unsupported model type.')
+        prob_t = torch.stack(probs)         #create tensor of network outputs while preserving computational graph
+        logp = torch.sum(torch.log(prob_t))     #add all log probabilities in the episode
+        loss = torch.div(torch.mul(discounted_reward,logp), hparams.batch_size) #divide by number of samples (i.e. episodes in batch)
         
         loss.backward()
         #accumulate gradient over batch_size episodes
@@ -173,8 +171,13 @@ def train(hparams, model):
 
 
 #############   Main
+if hparams.model_type == 'PGNetwork':
+    model = models.PGNetwork(hparams,GRID_SIZE,OUTPUT).to(DEVICE)
+elif hparams.model_type == 'NoisyPG':
+    pass
+elif hparams.model_type == 'CNN_PG':
+    model = models.CNN_PG(hparams, w=100, h=72, outputSize=OUTPUT).to(DEVICE)
 
-model = models.PGNetwork(hparams, inputSize=GRID_SIZE, outputSize=OUTPUT).to(DEVICE)
 best_score, best_episode = train(hparams,model)
 
 with open(os.path.join(PATH,'output.txt'),'a') as f:
