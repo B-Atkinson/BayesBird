@@ -95,21 +95,22 @@ class CNN_PG(torch.nn.Module):
         self.num_layers = hparams.num_hiddens
         self.hiddenSize = hparams.hidden
         self.outputSize = outputSize
-        self.softmax = hparams.softmax
+
+        #layer definitions
         self.temperature = torch.tensor(hparams.temperature if hparams.temperature > 0 else 1e-8, dtype=float)
         self.activations = {False:F.relu, True:F.leaky_relu}    #allows user to specify hidden activations
         
         self.conv1 = torch.nn.Conv2d(in_channels=2,out_channels=3, kernel_size=7, padding=2, stride=1, dilation=1)
-        w,h = self.__outSize(w,7,padLength=2), self.__outSize(h,7,padLength=2)
+        w,h = self.__outSize(w,7,padLength=2), self.__outSize(h,7,padLength=2)  #output of conv1 is out_channels x w x h
 
         self.pool = torch.nn.MaxPool2d(kernel_size=2,padding=0,stride=1,dilation=1)
-        w,h = self.__outSize(w,2,padLength=0), self.__outSize(h,2,padLength=0)
+        w,h = self.__outSize(w,2,padLength=0), self.__outSize(h,2,padLength=0)  #output of pool is out_channels x w x h
         
         self.conv2 = torch.nn.Conv2d(in_channels=3,out_channels=6, kernel_size=5, padding=2, stride=1, dilation=1)
-        w,h = self.__outSize(w,5,padLength=2), self.__outSize(h,5,padLength=2)
+        w,h = self.__outSize(w,5,padLength=2), self.__outSize(h,5,padLength=2)  #output of conv2 is out_channels x w x h
 
-        self.linear1 = torch.nn.Linear(6*w*h, 100)
-        self.linear2 = torch.nn.Linear(100,50)
+        self.linear1 = torch.nn.Linear(6*w*h, 100)  #linear layer takes a 1D tensor length out_channels * w * h, requires flattened tensor
+        self.linear2 = torch.nn.Linear(100,50)      
         self.linear3 = torch.nn.Linear(50,outputSize)
 
     def forward(self,x):
