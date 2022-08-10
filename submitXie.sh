@@ -1,21 +1,24 @@
 #!/bin/bash
 conda activate torch
 OUTPUT=/Users/student/Documents/brian/data/CNNTest/
-NUM=20000
+NUM=30000
 JOB=0
 SEED=1
+HIDDENS=3
 
-for HIDDENS in 3 4 5
+for LR in .01 .001 .0001
 do
 
-screen -dm python FBmain.py \
+screen -dm python /Users/student/Documents/brian/BayesBird/FBmain.py \
+--model_type=CNN_PG \
 --seed=$SEED \
 --output_dir=$OUTPUT \
 --num_episodes=$NUM \
 --num_hiddens=$HIDDENS \
 --batch_size=30 \
 --L2=.0001 \
---leaky=true \
+--learning_rate=$LR \
+--leaky=false \
 --sigmoid=false \
 --temperature=1e-7 \
 --softmax=false
