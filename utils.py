@@ -43,5 +43,5 @@ def processScreen(obs):
                 pass                
             else:
                 obs[i,j] = 1
-    return obs.astype(np.float).ravel()
+    return obs.astype(np.float)
 
