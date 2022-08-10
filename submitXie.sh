@@ -6,7 +6,7 @@ JOB=0
 SEED=1
 HIDDENS=3
 
-for LR in .01 .001 .0001
+for LR in .001 .0001 .00001
 do
 
 screen -dm python /Users/student/Documents/brian/BayesBird/FBmain.py \
@@ -19,7 +19,7 @@ screen -dm python /Users/student/Documents/brian/BayesBird/FBmain.py \
 --L2=.0001 \
 --learning_rate=$LR \
 --leaky=false \
---sigmoid=false \
+--sigmoid=true \
 --temperature=1e-7 \
 --softmax=false
 
