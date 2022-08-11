@@ -1,3 +1,4 @@
+from turtle import forward
 import torch
 import torch.nn.functional as F
 import numpy as np
@@ -20,30 +21,35 @@ class PGNetwork(torch.nn.Module):
         #class attributes
         self.leaky = hparams.leaky
         self.sigmoid = hparams.sigmoid
-        self.num_layers = hparams.num_hiddens
         self.hiddenSize = hparams.hidden
         self.outputSize = outputSize
         self.softmax = hparams.softmax
+        self.dropout_layer = GaussianDropout if 'GAUSS' in hparams.dropout_type.upper() else BernoulliDropout
         self.temperature = torch.tensor(hparams.temperature if hparams.temperature > 0 else 1e-8, dtype=float)
         self.activations = {False:F.relu, True:F.leaky_relu}    #allows user to specify hidden activations
         self.layers = torch.nn.ModuleList()                     #this will store the layers of the network
 
         self.layers.append( torch.nn.Linear(inputSize, self.hiddenSize) )
+        self.layers.append( self.dropout_layer(hparams.dropout,hparams.seed) )
+
         if self.num_layers <= 1:
             self.layers.append( torch.nn.Linear(self.hiddenSize, outputSize) )
         else:
             for lyr in range(2,self.num_layers+1):
                 self.layers.append( torch.nn.Linear(self.hiddenSize, self.hiddenSize) )
-            self.layers.append( torch.nn.Linear(self.hiddenSize, outputSize) )         
-        print(len(self.layers),flush=True)
+                self.layers.append( self.dropout_layer(hparams.dropout,hparams.seed) )
+            self.layers.append( torch.nn.Linear(self.hiddenSize, outputSize) )
+
+        self.num_layers = len(self.layers)
+        print(self.num_layers,flush=True)  #should be twice the number of specified hidden layers due to dropout
 
     def forward(self,x):
         '''Takes a 1D input vector and outputs a probability.'''
         #network for probability
-        for lyr in range(self.num_layers):
-            x = self.activations[self.leaky](self.layers[lyr](x))
+        for lyr in range(0,self.num_layers-1,2):
+            x = self.activations[self.leaky](self.layers[lyr+1](self.layers[lyr](x)))
         
-        p = self.layers[self.num_layers](x)
+        p = self.layers[self.num_layers-1](x)
         if self.sigmoid:
             p = torch.sigmoid(p / self.temperature)
         elif self.softmax:
@@ -128,3 +134,56 @@ class CNN_PG(torch.nn.Module):
         
     def __outSize(self, inputSize, kSize, padLength=0, stride=1, dilation=1):
         return floor( ((inputSize + 2*padLength - dilation * (kSize - 1) - 1) / stride) + 1 )
+
+class GaussianDropout(torch.nn.Module):
+    '''Applies noise to every element of the input tensor from sampling a mean=1, stddev=p/(1-p) Normal
+    distribution. 
+    References:
+    https://discuss.pytorch.org/t/gaussiandropout-implementation/151756/4
+    https://stackoverflow.com/questions/65501878/gaussiandropout-vs-dropout-vs-gaussiannoise-in-keras
+    
+    Input:
+    p_drop- the probability of an element in the input tensor to be zeroed out
+    seed- an integer that is used to seed the prng'''
+    def __init__(self,p_drop=.5,seed=1):
+        super(GaussianDropout,self).__init__()
+        self.alpha = p_drop / (1 - p_drop)
+        self.generator = torch.Generator()
+        self.generator.manual_seed(seed)
+
+    def forward(self, x):
+        '''Applies noise to every element of the input tensor from sampling a mean=1, stddev=p/(1-p) Normal
+        distribution.
+        
+        Input:
+        x- a tensor of activations/values to apply dropout to
+        
+        Output:
+        x- the tensor result of multiplicative Gaussian noise being applied to the input tensor'''
+        noise = torch.normal(mean=1,std=self.alpha,generator=self.generator,size=x.size())
+        x = torch.mul(x,noise)
+        return x
+
+class BernoulliDropout(torch.nn.Module):
+    '''Creates a dropout layer using a Bernoulli distribution with a probability of sampling 1
+    defined as (1 - p_drop). 
+    
+    Input:
+    p_drop- the probability of an element in the input tensor to be zeroed out'''
+    def __init__(self,p_drop=.5,seed=1):
+        super(BernoulliDropout,self).__init__()
+        self.p_drop = p_drop
+        self.bern = torch.distributions.bernoulli.Bernoulli(probs=(1-p_drop))
+    
+    def forward(self,x):
+        '''Applies noise to every element of the input tensor from sampling a Bernoulli distribution.
+        
+        Input:
+        x- a tensor of activations/values to apply dropout to
+        
+        Output:
+        x- the tensor result of Bernoulli noise being applied to the input tensor'''
+        noise = self.bern.sample(sample_shape=x.size())
+        x = torch.mul(x,noise)
+        return x
+        
