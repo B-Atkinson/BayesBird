@@ -63,6 +63,8 @@ def make_argparser():
     
     
     #training arguments
+    parser.add_argument('--dropout_type', type=str, default='Gauss',
+                        help="choose if Gaussian or Bernoulli dropout is used")
     parser.add_argument('--maximize', type=str2bool, default=True,\
                         help="if True, Adam will maximize the objective function. Not implemented for RMSprop")
     parser.add_argument('--model_type', type=str, default='PGNetwork',
