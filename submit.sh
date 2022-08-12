@@ -20,7 +20,7 @@ python FBmain.py \
 --L2=$L2 \
 --sigmoid=$SIG \
 --temperature=$TEMP \
---leaky=$LEAKY 
+--leaky=$LEAKY
 comment
 
 

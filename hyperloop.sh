@@ -1,19 +1,19 @@
 #!/bin/bash
-OUTPUT=/home/brian.atkinson/Bayes/data/CNNTest/
+OUTPUT=/home/brian.atkinson/Bayes/data/LRTest/
 echo -e "saving experiment to:\n$OUTPUT\n"
 NUM_EPS=30000
 SEED=1
-MODEL=CNN_PG
+MODEL=PGNetwork
 TEMP=1
 
 JOB=1
-for LR in .01 .001
+for LR in .0001 .00001
 do
-    for LEAKY in true false
+    for LEAKY in false
     do
         sbatch --job-name=$JOB \
         --export=ALL,OUTPUT=$OUTPUT,NUM_EPS=$NUM_EPS,SEED=$SEED,LR=$LR,TEMP=$TEMP,LEAKY=$LEAKY,MODEL=$MODEL \
-        --output=/home/brian.atkinson/Bayes/text_files/TempTest_$SEED.HIDDENS$HIDDENS.TEMP$TEMP.txt \
+        --output=/home/brian.atkinson/Bayes/text_files/LRTest_$SEED.TEMP$TEMP.txt \
         submit.sh
         let JOB=JOB+1
     done

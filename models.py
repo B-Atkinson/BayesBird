@@ -16,7 +16,7 @@ class PGNetwork(torch.nn.Module):
     inputSize- the 1D size of inputs to the network
     outputSize- number of outputs expected from the network, defaults to 1
     '''
-    def __init__(self, hparams, inputSize, outputSize=1):
+    def __init__(self, hparams, inputSize, outputSize, DEVICE):
         super(PGNetwork,self).__init__()
         #class attributes
         self.leaky = hparams.leaky
@@ -30,14 +30,14 @@ class PGNetwork(torch.nn.Module):
         self.layers = torch.nn.ModuleList()                     #this will store the layers of the network
 
         self.layers.append( torch.nn.Linear(inputSize, self.hiddenSize) )
-        self.layers.append( self.dropout_layer(hparams.dropout,hparams.seed) )
+        self.layers.append( self.dropout_layer(hparams.dropout,hparams.seed,DEVICE) )
 
-        if self.num_layers <= 1:
+        if hparams.num_hiddens <= 1:
             self.layers.append( torch.nn.Linear(self.hiddenSize, outputSize) )
         else:
-            for lyr in range(2,self.num_layers+1):
+            for lyr in range(2,hparams.num_hiddens+1):
                 self.layers.append( torch.nn.Linear(self.hiddenSize, self.hiddenSize) )
-                self.layers.append( self.dropout_layer(hparams.dropout,hparams.seed) )
+                self.layers.append( self.dropout_layer(hparams.dropout,hparams.seed,DEVICE) )
             self.layers.append( torch.nn.Linear(self.hiddenSize, outputSize) )
 
         self.num_layers = len(self.layers)
@@ -145,8 +145,9 @@ class GaussianDropout(torch.nn.Module):
     Input:
     p_drop- the probability of an element in the input tensor to be zeroed out
     seed- an integer that is used to seed the prng'''
-    def __init__(self,p_drop=.5,seed=1):
+    def __init__(self,p_drop=.5,seed=1,DEVICE=None):
         super(GaussianDropout,self).__init__()
+        self.DEVICE = DEVICE
         self.alpha = p_drop / (1 - p_drop)
         self.generator = torch.Generator()
         self.generator.manual_seed(seed)
@@ -160,7 +161,7 @@ class GaussianDropout(torch.nn.Module):
         
         Output:
         x- the tensor result of multiplicative Gaussian noise being applied to the input tensor'''
-        noise = torch.normal(mean=1,std=self.alpha,generator=self.generator,size=x.size())
+        noise = torch.normal(mean=1,std=self.alpha,generator=self.generator,size=x.size()).to(self.DEVICE)
         x = torch.mul(x,noise)
         return x
 
@@ -170,8 +171,9 @@ class BernoulliDropout(torch.nn.Module):
     
     Input:
     p_drop- the probability of an element in the input tensor to be zeroed out'''
-    def __init__(self,p_drop=.5,seed=1):
+    def __init__(self,device,p_drop=.5,seed=1,DEVICE=None):
         super(BernoulliDropout,self).__init__()
+        self.DEVICE = DEVICE
         self.p_drop = p_drop
         self.bern = torch.distributions.bernoulli.Bernoulli(probs=(1-p_drop))
     
@@ -183,7 +185,7 @@ class BernoulliDropout(torch.nn.Module):
         
         Output:
         x- the tensor result of Bernoulli noise being applied to the input tensor'''
-        noise = self.bern.sample(sample_shape=x.size())
+        noise = self.bern.sample(sample_shape=x.size()).to(self.DEVICE)
         x = torch.mul(x,noise)
         return x
         

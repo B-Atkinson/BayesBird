@@ -177,11 +177,11 @@ def train(hparams, model):
 
 #############   Main
 if hparams.model_type == 'PGNetwork':
-    model = models.PGNetwork(hparams,GRID_SIZE,OUTPUT).to(DEVICE)
+    model = models.PGNetwork(hparams,GRID_SIZE,OUTPUT,DEVICE).to(DEVICE)
 elif hparams.model_type == 'NoisyPG':
     pass
 elif hparams.model_type == 'CNN_PG':
-    model = models.CNN_PG(hparams, w=100, h=72, outputSize=OUTPUT).to(DEVICE)
+    model = models.CNN_PG(hparams, w=100, h=72, outputSize=OUTPUT,DEVICE=DEVICE).to(DEVICE)
 
 best_score, best_episode = train(hparams,model)
 
