@@ -120,7 +120,7 @@ def train(hparams, model):
                 sample = torch.rand(1,dtype=torch.float32,generator=rng).to(DEVICE)
             else:
                 sample = torch.rand(1,dtype=float,generator=rng).to(DEVICE)
-            action = ACTION_MAP['flap'] if sample < p_up else ACTION_MAP['noop']   
+            action = ACTION_MAP['flap'] if sample <= p_up else ACTION_MAP['noop']   
             
             #take the action
             reward = game.act(action)
