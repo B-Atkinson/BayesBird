@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH --mem=4G
+#SBATCH --mem=16G
 #SBATCH --partition=beards
 #SBATCH --gres=gpu:1
-#SBATCH --time=00-02:30:00
+#SBATCH --time=00-00:30:00
 
 . /etc/profile
 
@@ -34,4 +34,6 @@ python FBmain.py \
 --learning_rate=$LR \
 --sigmoid=true \
 --leaky=$LEAKY \
---model_type=$MODEL
+--model_type=$MODEL \
+--dropout_type=GAUSS \
+--dropout=.5

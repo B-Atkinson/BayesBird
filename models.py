@@ -24,6 +24,7 @@ class PGNetwork(torch.nn.Module):
         self.hiddenSize = hparams.hidden
         self.outputSize = outputSize
         self.softmax = hparams.softmax
+        self.evaluate = False
         self.dropout_layer = GaussianDropout if 'GAUSS' in hparams.dropout_type.upper() else BernoulliDropout
         self.temperature = torch.tensor(hparams.temperature if hparams.temperature > 0 else 1e-8, dtype=float)
         self.activations = {False:F.relu, True:F.leaky_relu}    #allows user to specify hidden activations
@@ -46,62 +47,46 @@ class PGNetwork(torch.nn.Module):
     def forward(self,x):
         '''Takes a 1D input vector and outputs a probability.'''
         #network for probability
-        for lyr in range(0,self.num_layers-1,2):
-            x = self.activations[self.leaky](self.layers[lyr+1](self.layers[lyr](x)))
-        
-        p = self.layers[self.num_layers-1](x)
-        if self.sigmoid:
-            p = torch.sigmoid(p / self.temperature)
-        elif self.softmax:
-            if self.outputSize > 1:
-                p = F.softmax(p)
-            else:
-                raise Exception('Softmax requires output size >1 to be useful')
-        return p
-        
-class NoisyPG(torch.nn.Module):
-    '''A neural network that uses heteroscedastic uncertainty to produce a probability of going up. uses l2 normalization.'''
-    def __init__(self, hparams, inputSize, outputSize):
-        super(NoisyPG,self).__init__()
-        #define layers for probability
-        raise NotImplementedError('This model has not been developed yet.')
-
-        self.leaky = hparams.leaky
-        self.sigmoid = hparams.sigmoid
-        self.num_layers = hparams.num_hiddens
-        self.hiddenSize = hparams.hidden
-        self.temperature = torch.tensor(hparams.temperature if hparams.temperature > 0 else 1e-6, dtype=float)
-        self.activations = {False:F.relu, True:F.leaky_relu}
-
-        self.layers = torch.nn.ModuleList()
-        self.layers.append( torch.nn.Linear(inputSize, self.hiddenSize) )
-        if self.num_layers <= 1:
-            self.layers.append( torch.nn.Linear(self.hiddenSize, outputSize) )
+        if not self.evaluate:
+            #utilize dropout during training
+            for lyr in range(0,self.num_layers-1,2):
+                x = self.activations[self.leaky](self.layers[lyr+1](self.layers[lyr](x)))
+            
+            p = self.layers[self.num_layers-1](x)
+            if self.sigmoid:
+                p = torch.sigmoid(p / self.temperature)
+            elif self.softmax:
+                if self.outputSize > 1:
+                    p = F.softmax(p)
+                else:
+                    raise Exception('Softmax requires output size >1 to be useful')
+            return p
         else:
-            for lyr in range(2,self.num_layers+1):
-                self.layers.append( torch.nn.Linear(self.hiddenSize, self.hiddenSize) )
-            self.layers.append( torch.nn.Linear(self.hiddenSize, outputSize) )  
-        print(len(self.layers),flush=True)
+            #do not use dropout during evaluation when the model is expected to be trained
+            for lyr in range(0,self.num_layers-1,2):
+                x = self.activations[self.leaky](self.layers[lyr](x))
+            
+            p = self.layers[self.num_layers-1](x)
+            if self.sigmoid:
+                p = torch.sigmoid(p / self.temperature)
+            elif self.softmax:
+                if self.outputSize > 1:
+                    p = F.softmax(p)
+                else:
+                    raise Exception('Softmax requires output size >1 to be useful')
+            return p
         
-    def forward(self,x):
-        #network for probability
-        for lyr in range(self.num_layers):
-            x = self.activations[self.leaky](self.layers[lyr](x))
-        
-        p = self.layers[self.num_layers](x)
-        if self.sigmoid:
-            p = torch.sigmoid(p / self.temperature)
-        return p
-
 class CNN_PG(torch.nn.Module):
     '''Uses a deep CNN to implement a policy gradient network. Compares current state'''
-    def __init__(self,hparams,w,h,outputSize):
+    def __init__(self,hparams,w,h,outputSize,DEVICE):
         super(CNN_PG,self).__init__()
         self.leaky = hparams.leaky
         self.sigmoid = hparams.sigmoid
         self.num_layers = hparams.num_hiddens
         self.hiddenSize = hparams.hidden
         self.outputSize = outputSize
+        self.evaluate = False
+        self.dropout_layer = GaussianDropout if 'GAUSS' in hparams.dropout_type.upper() else BernoulliDropout
 
         #layer definitions
         self.temperature = torch.tensor(hparams.temperature if hparams.temperature > 0 else 1e-8, dtype=float)
@@ -110,27 +95,50 @@ class CNN_PG(torch.nn.Module):
         ch1 = 6
         self.conv1 = torch.nn.Conv2d(in_channels=2,out_channels=ch1, kernel_size=7, padding=2, stride=1, dilation=1)
         w,h = self.__outSize(w,7,padLength=2), self.__outSize(h,7,padLength=2)  #output of conv1 is ch1 x w x h
+        self.d1 = self.dropout_layer(hparams.dropout,hparams.seed,DEVICE)
 
         self.pool = torch.nn.MaxPool2d(kernel_size=2,padding=0,stride=1,dilation=1)
         w,h = self.__outSize(w,2,padLength=0), self.__outSize(h,2,padLength=0)  #output of pool is ch1 x w x h
+        self.d2 = self.dropout_layer(hparams.dropout,hparams.seed,DEVICE)
         
         ch2 = 12
         self.conv2 = torch.nn.Conv2d(in_channels=ch1,out_channels=ch2, kernel_size=5, padding=2, stride=1, dilation=1)
         w,h = self.__outSize(w,5,padLength=2), self.__outSize(h,5,padLength=2)  #output of conv2 is ch2 x w x h
+        self.d3 = self.dropout_layer(hparams.dropout,hparams.seed,DEVICE)
 
         self.linear1 = torch.nn.Linear(ch2*w*h, 100)  #linear layer takes a 1D tensor length out_channels * w * h, requires flattened tensor
+        self.d4 = self.dropout_layer(hparams.dropout,hparams.seed,DEVICE)
+        
         self.linear2 = torch.nn.Linear(100,50)      
+        self.d5 = self.dropout_layer(hparams.dropout,hparams.seed,DEVICE)
+        
         self.linear3 = torch.nn.Linear(50,outputSize)
 
     def forward(self,x):
-        x = self.activations[self.leaky](self.conv1(x))
-        x = self.pool(x)
-        x = self.activations[self.leaky](self.conv2(x))
-        x = self.activations[self.leaky](self.linear1(torch.flatten(x)))
-        x = self.activations[self.leaky](self.linear2(x))
-        if self.sigmoid:
-            x = torch.sigmoid(self.linear3(x))
-        return x
+        if not self.evaluate:
+            #utilize dropout during training
+            x = self.activations[self.leaky](self.d1(self.conv1(x)))
+            x = self.d2(self.pool(x))
+            x = self.activations[self.leaky](self.d3(self.conv2(x)))
+            x = self.activations[self.leaky](self.d4(self.linear1(torch.flatten(x))))
+            x = self.activations[self.leaky](self.d5(self.linear2(x)))
+            if self.sigmoid:
+                x = torch.sigmoid(self.linear3(x))
+            else:
+                x = self.activations[self.leaky](self.linear3(x))
+            return x
+        else:
+            #do not use dropout during evaluation
+            x = self.activations[self.leaky](self.conv1(x))
+            x = self.pool(x)
+            x = self.activations[self.leaky](self.conv2(x))
+            x = self.activations[self.leaky](self.linear1(torch.flatten(x)))
+            x = self.activations[self.leaky](self.linear2(x))
+            if self.sigmoid:
+                x = torch.sigmoid(self.linear3(x))
+            else:
+                x = self.activations[self.leaky](self.linear3(x))
+            return x
         
     def __outSize(self, inputSize, kSize, padLength=0, stride=1, dilation=1):
         return floor( ((inputSize + 2*padLength - dilation * (kSize - 1) - 1) / stride) + 1 )
@@ -171,7 +179,7 @@ class BernoulliDropout(torch.nn.Module):
     
     Input:
     p_drop- the probability of an element in the input tensor to be zeroed out'''
-    def __init__(self,device,p_drop=.5,seed=1,DEVICE=None):
+    def __init__(self,p_drop=.5,seed=1,DEVICE=None):
         super(BernoulliDropout,self).__init__()
         self.DEVICE = DEVICE
         self.p_drop = p_drop
