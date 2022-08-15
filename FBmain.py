@@ -138,11 +138,16 @@ def train(hparams, model):
             
         #update performance variables
         if num_pipes > best_score:
+            string = ''
             pickle.dump(frames,open(PATH+'/bestFrames.p','wb'))
+            try:
+                torch.save(model,PATH+'/bestModel.pt')
+            except TypeError:
+                string = 'CANNOT SAVE MODEL WTIH GENERATOR OBJECT\n'
             best_score = num_pipes
             best_episode = episode
             with open(os.path.join(PATH,'output.txt'),'a') as f:
-                f.write(f'\nnew high score:{best_score} episode:{best_episode}\n')
+                f.write(f'\n{string}new high score:{best_score} episode:{best_episode}\n')
         training_summaries.append( (episode, num_pipes) )
         
         stacked_rewards = np.vstack(rewards)
@@ -172,8 +177,64 @@ def train(hparams, model):
         writer = csv.writer(file)
         writer.writerows(training_summaries)
         
-    return best_score, best_episode
+    return model, (best_score, best_episode)
 
+
+
+def evaluate(hparams, model):
+    #Initialize FB environment   
+    FLAPPYBIRD = FlappyBird(rngSeed=hparams.seed+1)
+    game = PLE(FLAPPYBIRD, display_screen=hparams.render, force_fps=True, rng=hparams.seed+1, reward_values=REWARDDICT)
+    game.init()
+
+    with open(os.path.join(PATH,'output.txt'),'a') as f:
+        f.write(f'commencing evaluation\n')
+    print(f'commencing evaluation',flush=True)
+
+    game.reset_game()
+        
+    num_pipes = 0
+    frames = []
+    lastFrame = np.zeros([72,100],dtype=float)
+        
+    #play a single game
+    while not game.game_over():
+        #retrieve current game state and process into tensor
+        currentFrame = game.getScreenRGB()
+        frame_np = utils.processScreen(currentFrame)
+            
+        #choose the appropriate model and get our action
+        if hparams.model_type == 'PGNetwork':
+            combined_np = np.subtract(frame_np,lastFrame).ravel()          #combine the current frame with the last frame, and flatten
+            frame_t = torch.from_numpy(combined_np).float().to(DEVICE)     #convert to a tensor
+            p = model(frame_t)
+        elif hparams.model_type == 'NoisyPG':
+            combined_np = np.subtract(frame_np,lastFrame).ravel()          #combine the current frame with the last frame, and flatten
+            frame_t = torch.from_numpy(combined_np).float().to(DEVICE)     #convert to a tensor
+            p = model(frame_t)
+        elif hparams.model_type == 'CNN_PG':
+            stack_t = torch.stack([torch.from_numpy(frame_np).float(),torch.from_numpy(lastFrame).float()],0).to(DEVICE)
+            p = model(stack_t)
+        else:
+            raise Exception('Unsupported model type.')         
+
+        #update last frame array
+        lastFrame = np.copy(frame_np)
+
+        #get the action to take
+        p_up = p[0].clone().to(DEVICE) if hparams.softmax else p.clone().to(DEVICE)
+        action = ACTION_MAP['flap'] if .5 <= p_up else ACTION_MAP['noop']   
+            
+        #take the action
+        reward = game.act(action)
+            
+        #record data for this step
+        if reward > 0:
+            num_pipes += 1
+            frames.append(currentFrame)
+    return num_pipes
+
+    
 
 #############   Main
 if hparams.model_type == 'PGNetwork':
@@ -183,11 +244,23 @@ elif hparams.model_type == 'NoisyPG':
 elif hparams.model_type == 'CNN_PG':
     model = models.CNN_PG(hparams, w=100, h=72, outputSize=OUTPUT,DEVICE=DEVICE).to(DEVICE)
 
-best_score, best_episode = train(hparams,model)
-
+lastModel, (best_score, best_episode) = train(hparams,model)
 with open(os.path.join(PATH,'output.txt'),'a') as f:
-    f.write(f'\ntraining completed\nbest score: {best_score} achieved at episode {best_episode}\n')
-print(f'\ntraining completed\nbest score: {best_score} achieved at episode {best_episode}')
+    f.write(f'\ntraining completed\nbest score: {best_score} achieved at episode {best_episode}\n\nbeginning evaluation\n')
+print(f'\ntraining completed\nbest score: {best_score} achieved at episode {best_episode}\n\nbeginning evaluation\n',flush=True)
 
-with open(PATH+'/digest.txt','w') as f:
-    f.write(f'best episode:{best_episode}\nbest score: {best_score}\n')
+try:
+    bestModel = torch.load(PATH+'/bestModel.pt',map_location=DEVICE)
+    bestModel.evaluate = True
+    num_pipes = evaluate(hparams,bestModel)
+    with open(os.path.join(PATH,'output.txt'),'a') as f:
+        f.write(f'\ntrue best evaluation completed\nscore: {num_pipes}\n')
+
+except:
+    with open(PATH+'/digest.txt','w') as f:
+        f.write(f'Unable to load best model\n')
+
+lastModel.evaluate = True
+num_pipes = evaluate(hparams,lastModel)
+with open(os.path.join(PATH,'output.txt'),'a') as f:
+        f.write(f'\nlast model evaluation completed\nscore: {num_pipes}\n')
