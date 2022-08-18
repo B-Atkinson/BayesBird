@@ -6,7 +6,7 @@
 
 . /etc/profile
 
-module load lang/miniconda3
+module load lang/miniconda3/4.10.3
 module load lib/cuda/11.3
 
 source activate torch

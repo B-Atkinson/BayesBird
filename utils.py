@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import os
+import cv2
 
 def build_directories(hparams,PATH):
     '''Builds all the directories needed to save test results to disk. Returns the paths to the various directories'''
@@ -26,22 +27,26 @@ def discount_rewards(r, gamma):
     #return sum of discounted reward vector
     return sum(discounts)
 
-def processScreen(obs):
-    '''Takes as input a 512x288x3 numpy ndarray and downsamples it twice to get a 100x72 output array. Usless background 
-       pixels were manually overwritten with 33 in channel 0 to be easier to detect in-situ. Rows 400-512 never change 
-       because they're the ground, so they are cropped before downsampling. To reduce the number of parameters of the model,
-       only using the 0th channel of the original image.'''
-    obs = obs[::2,:400:2,0]
-    obs = obs[::2,::2]
-    col,row =np.shape(obs)
-    for i in range(col):
-        for j in range(row):
-            #background pixels only have value on channel 0, and the value is 33
-            if (obs[i,j]==33):
-                obs[i,j] = 0
-            elif (obs[i,j]==0):
-                pass                
-            else:
-                obs[i,j] = 1
-    return obs.astype(np.float)
+# def processScreen(obs):
+#     '''Takes as input a 512x288x3 numpy ndarray and downsamples it twice to get a 100x72 output array. Usless background 
+#        pixels were manually overwritten with 33 in channel 0 to be easier to detect in-situ. Rows 400-512 never change 
+#        because they're the ground, so they are cropped before downsampling. To reduce the number of parameters of the model,
+#        only using the 0th channel of the original image.'''
+#     obs = obs[::2,:400:2,0]
+#     obs = obs[::2,::2]
+#     col,row =np.shape(obs)
+#     for i in range(col):
+#         for j in range(row):
+#             #background pixels only have value on channel 0, and the value is 33
+#             if (obs[i,j]==33):
+#                 obs[i,j] = 0
+#             elif (obs[i,j]==0):
+#                 pass                
+#             else:
+#                 obs[i,j] = 1
+#     return obs.astype(np.float)
 
+def processScreen(obs):
+    image = cv2.cvtColor(cv2.resize(obs, (72,100)), cv2.COLOR_BGR2GRAY)
+    _, image = cv2.threshold(image, 1, 255, cv2.THRESH_BINARY)
+    return image[None, :, :].astype(np.float32)
