@@ -24,7 +24,7 @@ class PGNetwork(torch.nn.Module):
         self.hiddenSize = hparams.hidden
         self.outputSize = outputSize
         self.softmax = hparams.softmax
-        self.evaluate = False
+        self.DEVICE = DEVICE
         self.dropout_layer = GaussianDropout if 'GAUSS' in hparams.dropout_type.upper() else BernoulliDropout
         self.temperature = torch.tensor(hparams.temperature if hparams.temperature > 0 else 1e-8, dtype=float)
         self.activations = {False:F.relu, True:F.leaky_relu}    #allows user to specify hidden activations
@@ -47,34 +47,26 @@ class PGNetwork(torch.nn.Module):
     def forward(self,x):
         '''Takes a 1D input vector and outputs a probability.'''
         #network for probability
-        if not self.evaluate:
-            #utilize dropout during training
-            for lyr in range(0,self.num_layers-1,2):
-                x = self.activations[self.leaky](self.layers[lyr+1](self.layers[lyr](x)))
-            
-            p = self.layers[self.num_layers-1](x)
-            if self.sigmoid:
-                p = torch.sigmoid(p / self.temperature)
-            elif self.softmax:
-                if self.outputSize > 1:
-                    p = F.softmax(p)
-                else:
-                    raise Exception('Softmax requires output size >1 to be useful')
-            return p
-        else:
-            #do not use dropout during evaluation when the model is expected to be trained
-            for lyr in range(0,self.num_layers-1,2):
-                x = self.activations[self.leaky](self.layers[lyr](x))
-            
-            p = self.layers[self.num_layers-1](x)
-            if self.sigmoid:
-                p = torch.sigmoid(p / self.temperature)
-            elif self.softmax:
-                if self.outputSize > 1:
-                    p = F.softmax(p)
-                else:
-                    raise Exception('Softmax requires output size >1 to be useful')
-            return p
+        for lyr in range(0,self.num_layers-1,2):
+            x = self.activations[self.leaky](self.layers[lyr+1](self.layers[lyr](x)))
+        
+        p = self.layers[self.num_layers-1](x)
+        if self.sigmoid:
+            p = torch.sigmoid(p / self.temperature)
+        elif self.softmax:
+            if self.outputSize > 1:
+                p = F.softmax(p)
+            else:
+                raise Exception('Softmax requires output size >1 to be useful')
+        return p
+
+    def evaluate(self,x,m=10):
+        '''After training using m=1 for Monte Carlo, use a larger m-value to get more accurate result. 
+        Default m-value is 10.'''
+        inferences = torch.zeros(m).to(self.DEVICE)
+        for i in range(m):
+            inferences[i] = self.forward(x).detach()
+        return torch.mean(inferences)
         
 class CNN_PG(torch.nn.Module):
     '''Uses a deep CNN to implement a policy gradient network. Compares current state'''
@@ -85,7 +77,7 @@ class CNN_PG(torch.nn.Module):
         self.num_layers = hparams.num_hiddens
         self.hiddenSize = hparams.hidden
         self.outputSize = outputSize
-        self.evaluate = False
+        self.DEVICE = DEVICE
         self.dropout_layer = GaussianDropout if 'GAUSS' in hparams.dropout_type.upper() else BernoulliDropout
 
         #layer definitions
@@ -115,30 +107,27 @@ class CNN_PG(torch.nn.Module):
         self.linear3 = torch.nn.Linear(50,outputSize)
 
     def forward(self,x):
-        if not self.evaluate:
-            #utilize dropout during training
-            x = self.activations[self.leaky](self.d1(self.conv1(x)))
-            x = self.d2(self.pool(x))
-            x = self.activations[self.leaky](self.d3(self.conv2(x)))
-            x = self.activations[self.leaky](self.d4(self.linear1(torch.flatten(x))))
-            x = self.activations[self.leaky](self.d5(self.linear2(x)))
-            if self.sigmoid:
-                x = torch.sigmoid(self.linear3(x))
-            else:
-                x = self.activations[self.leaky](self.linear3(x))
-            return x
+        #utilize dropout during training
+        x = self.activations[self.leaky](self.d1(self.conv1(x)))
+        x = self.d2(self.pool(x))
+        x = self.activations[self.leaky](self.d3(self.conv2(x)))
+        x = self.activations[self.leaky](self.d4(self.linear1(torch.flatten(x))))
+        x = self.activations[self.leaky](self.d5(self.linear2(x)))
+        if self.sigmoid:
+            x = torch.sigmoid(self.linear3(x))
         else:
-            #do not use dropout during evaluation
-            x = self.activations[self.leaky](self.conv1(x))
-            x = self.pool(x)
-            x = self.activations[self.leaky](self.conv2(x))
-            x = self.activations[self.leaky](self.linear1(torch.flatten(x)))
-            x = self.activations[self.leaky](self.linear2(x))
-            if self.sigmoid:
-                x = torch.sigmoid(self.linear3(x))
-            else:
-                x = self.activations[self.leaky](self.linear3(x))
-            return x
+            x = self.activations[self.leaky](self.linear3(x))
+        return x
+            
+
+    def evaluate(self,x,m=10):
+        '''After training using m=1 for Monte Carlo, use a larger m-value to get more accurate result. 
+        Default m-value is 10.'''
+        inferences = torch.zeros(m).to(self.DEVICE)
+        for i in range(m):
+            inferences[i] = self.forward(x).detach()
+        return torch.mean(inferences)
+
         
     def __outSize(self, inputSize, kSize, padLength=0, stride=1, dilation=1):
         return floor( ((inputSize + 2*padLength - dilation * (kSize - 1) - 1) / stride) + 1 )

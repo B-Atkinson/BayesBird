@@ -101,10 +101,6 @@ def train(hparams, model):
                 combined_np = np.subtract(frame_np,lastFrame).ravel()          #combine the current frame with the last frame, and flatten
                 frame_t = torch.from_numpy(combined_np).float().to(DEVICE)     #convert to a tensor
                 p = model(frame_t)
-            elif hparams.model_type == 'NoisyPG':
-                combined_np = np.subtract(frame_np,lastFrame).ravel()          #combine the current frame with the last frame, and flatten
-                frame_t = torch.from_numpy(combined_np).float().to(DEVICE)     #convert to a tensor
-                p = model(frame_t)
             elif hparams.model_type == 'CNN_PG':
                 stack_t = torch.stack([torch.from_numpy(frame_np).float(),torch.from_numpy(lastFrame).float()],0).to(DEVICE)
                 p = model(stack_t)
@@ -207,14 +203,10 @@ def evaluate(hparams, model):
         if hparams.model_type == 'PGNetwork':
             combined_np = np.subtract(frame_np,lastFrame).ravel()          #combine the current frame with the last frame, and flatten
             frame_t = torch.from_numpy(combined_np).float().to(DEVICE)     #convert to a tensor
-            p = model(frame_t)
-        elif hparams.model_type == 'NoisyPG':
-            combined_np = np.subtract(frame_np,lastFrame).ravel()          #combine the current frame with the last frame, and flatten
-            frame_t = torch.from_numpy(combined_np).float().to(DEVICE)     #convert to a tensor
-            p = model(frame_t)
+            p = model.evaluate(frame_t)
         elif hparams.model_type == 'CNN_PG':
             stack_t = torch.stack([torch.from_numpy(frame_np).float(),torch.from_numpy(lastFrame).float()],0).to(DEVICE)
-            p = model(stack_t)
+            p = model.evaluate(stack_t)
         else:
             raise Exception('Unsupported model type.')         
 
@@ -237,30 +229,31 @@ def evaluate(hparams, model):
     
 
 #############   Main
+
+#train a model
 if hparams.model_type == 'PGNetwork':
     model = models.PGNetwork(hparams,GRID_SIZE,OUTPUT,DEVICE).to(DEVICE)
-elif hparams.model_type == 'NoisyPG':
-    pass
 elif hparams.model_type == 'CNN_PG':
     model = models.CNN_PG(hparams, w=100, h=72, outputSize=OUTPUT,DEVICE=DEVICE).to(DEVICE)
+else:
+    raise Exception('Unsupported model type.')  
 
+#evaulate the model resulting from full training length
 lastModel, (best_score, best_episode) = train(hparams,model)
 with open(os.path.join(PATH,'output.txt'),'a') as f:
     f.write(f'\ntraining completed\nbest score: {best_score} achieved at episode {best_episode}\n\nbeginning evaluation\n')
 print(f'\ntraining completed\nbest score: {best_score} achieved at episode {best_episode}\n\nbeginning evaluation\n',flush=True)
+num_pipes = evaluate(hparams,lastModel)
+with open(os.path.join(PATH,'output.txt'),'a') as f:
+        f.write(f'\nlast model evaluation completed\nscore: {num_pipes}\n')
 
+#attempt to evaluate the best overall model from training
 try:
     bestModel = torch.load(PATH+'/bestModel.pt',map_location=DEVICE)
-    bestModel.evaluate = True
     num_pipes = evaluate(hparams,bestModel)
     with open(os.path.join(PATH,'output.txt'),'a') as f:
         f.write(f'\ntrue best evaluation completed\nscore: {num_pipes}\n')
-
 except:
     with open(PATH+'/digest.txt','w') as f:
         f.write(f'Unable to load best model\n')
 
-lastModel.evaluate = True
-num_pipes = evaluate(hparams,lastModel)
-with open(os.path.join(PATH,'output.txt'),'a') as f:
-        f.write(f'\nlast model evaluation completed\nscore: {num_pipes}\n')
