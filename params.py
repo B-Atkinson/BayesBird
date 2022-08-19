@@ -73,6 +73,10 @@ def make_argparser():
                         help="the number of episodes to train the agent on")
     parser.add_argument('--save_stats', type=int, default=200,
                         help="specifies the number of episodes to wait until saving network parameters, training summaries, and moves")
+    parser.add_argument('--screenHeight', type=int, default=100,
+                        help="size of post-processed screen, default is downsampled 4x")
+    parser.add_argument('--screenWidth', type=int, default=72,
+                        help="size of post-processed screen, default is downsampled 4x")
     parser.add_argument('--seed', type=int, default=1,
                         help="specify a number to seed the PRNGs with")
     
