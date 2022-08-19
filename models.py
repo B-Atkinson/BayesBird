@@ -1,7 +1,6 @@
 from turtle import forward
 import torch
 import torch.nn.functional as F
-import numpy as np
 from math import floor
 
 
@@ -48,7 +47,7 @@ class PGNetwork(torch.nn.Module):
         '''Takes a 1D input vector and outputs a probability.'''
         #network for probability
         for lyr in range(0,self.num_layers-1,2):
-            x = self.activations[self.leaky](self.layers[lyr+1](self.layers[lyr](x)))
+            x = self.layers[lyr+1](self.activations[self.leaky](self.layers[lyr](x)))
         
         p = self.layers[self.num_layers-1](x)
         if self.sigmoid:
@@ -84,35 +83,36 @@ class CNN_PG(torch.nn.Module):
         self.temperature = torch.tensor(hparams.temperature if hparams.temperature > 0 else 1e-8, dtype=float)
         self.activations = {False:F.relu, True:F.leaky_relu}    #allows user to specify hidden activations
         
-        ch1 = 6
-        self.conv1 = torch.nn.Conv2d(in_channels=2,out_channels=ch1, kernel_size=7, padding=2, stride=1, dilation=1)
-        w,h = self.__outSize(w,7,padLength=2), self.__outSize(h,7,padLength=2)  #output of conv1 is ch1 x w x h
+        ch1,kSize1,pad1,stride1 = 32,8,3,4
+        self.conv1 = torch.nn.Conv2d(in_channels=2,out_channels=ch1, kernel_size=kSize1, padding=pad1, stride=stride1)
+        w,h = self.__outSize(w,kSize=kSize1,padLength=pad1,stride=stride1), self.__outSize(h,kSize=kSize1,padLength=pad1,stride=stride1)  #output of conv1 is ch1 x w x h
         self.d1 = self.dropout_layer(hparams.dropout,hparams.seed,DEVICE)
 
-        self.pool = torch.nn.MaxPool2d(kernel_size=2,padding=0,stride=1,dilation=1)
-        w,h = self.__outSize(w,2,padLength=0), self.__outSize(h,2,padLength=0)  #output of pool is ch1 x w x h
+        ch2,kSize2,pad2,stride2 = 64,4,2,1
+        self.conv2 = torch.nn.Conv2d(in_channels=ch1,out_channels=ch2, kernel_size=kSize2, padding=pad2, stride=stride2)
+        w,h = self.__outSize(w,kSize=kSize2,padLength=pad2,stride=stride2), self.__outSize(h,kSize=kSize2,padLength=pad2,stride=stride2)  #output of pool is ch1 x w x h
         self.d2 = self.dropout_layer(hparams.dropout,hparams.seed,DEVICE)
         
-        ch2 = 12
-        self.conv2 = torch.nn.Conv2d(in_channels=ch1,out_channels=ch2, kernel_size=5, padding=2, stride=1, dilation=1)
-        w,h = self.__outSize(w,5,padLength=2), self.__outSize(h,5,padLength=2)  #output of conv2 is ch2 x w x h
+        ch3,kSize3,pad3,stride3 = 64,3,0,1
+        self.conv3 = torch.nn.Conv2d(in_channels=ch2,out_channels=ch3, kernel_size=kSize3, padding=pad3, stride=stride3)
+        w,h = self.__outSize(w,kSize=kSize3,padLength=pad3,stride=stride3), self.__outSize(h,kSize=kSize3,padLength=pad3,stride=stride3)  #output of pool is ch1 x w x h
         self.d3 = self.dropout_layer(hparams.dropout,hparams.seed,DEVICE)
 
-        self.linear1 = torch.nn.Linear(ch2*w*h, 100)  #linear layer takes a 1D tensor length out_channels * w * h, requires flattened tensor
+        self.linear1 = torch.nn.Linear(ch3*w*h, 200)  #linear layer takes a 1D tensor length out_channels * w * h, requires flattened tensor
         self.d4 = self.dropout_layer(hparams.dropout,hparams.seed,DEVICE)
         
-        self.linear2 = torch.nn.Linear(100,50)      
+        self.linear2 = torch.nn.Linear(200,50)      
         self.d5 = self.dropout_layer(hparams.dropout,hparams.seed,DEVICE)
         
         self.linear3 = torch.nn.Linear(50,outputSize)
 
     def forward(self,x):
         #utilize dropout during training
-        x = self.activations[self.leaky](self.d1(self.conv1(x)))
-        x = self.d2(self.pool(x))
-        x = self.activations[self.leaky](self.d3(self.conv2(x)))
-        x = self.activations[self.leaky](self.d4(self.linear1(torch.flatten(x))))
-        x = self.activations[self.leaky](self.d5(self.linear2(x)))
+        x = self.d1(self.activations[self.leaky](self.conv1(x)))
+        x = self.d2(self.activations[self.leaky](self.conv2(x)))
+        x = self.d3(self.activations[self.leaky](self.conv3(x)))
+        x = self.d4(self.activations[self.leaky](self.linear1(torch.flatten(x))))
+        x = self.d5(self.activations[self.leaky](self.linear2(x)))
         if self.sigmoid:
             x = torch.sigmoid(self.linear3(x))
         else:
