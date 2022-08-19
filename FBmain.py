@@ -1,5 +1,4 @@
 import torch
-import torch.nn.functional as F
 import os
 import pickle
 import json
@@ -12,7 +11,7 @@ from pygame.constants import K_w
 import params
 import utils
 import models
-from tqdm import tqdm
+from matplotlib import pyplot as plt
 
 
 
@@ -38,14 +37,14 @@ lastAct = "Sig" if hparams.sigmoid else "Linear"
 lastAct = "Softmax" if hparams.softmax else lastAct
 
 #specified in ple/__init__.py lines 187-194
-WIDTH = 100     #downsample by half twice
-HEIGHT = 72    #downsample by half twice
+WIDTH = hparams.screenWidth     #if downsample by 4, w=72
+HEIGHT = hparams.screenHeight    #if downsample by 4, h=100
 GRID_SIZE = WIDTH * HEIGHT
 ACTION_MAP = {'flap': K_w,'noop': None}
 REWARDDICT = {"positive":2, "loss":-5}
 OUTPUT = 2 if hparams.softmax else 1
-PATH = hparams.output_dir + hparams.model_type +  f"-S:{hparams.seed}" + f"-Layers:{hparams.num_hiddens}" + f"-leaky:{hparams.leaky}" + f"-OutputAct:{lastAct}"
-PATH, STATS = utils.build_directories(hparams,PATH)
+PATH = hparams.output_dir + hparams.model_type +  f"-weirdDiscount-greedy"
+PATH, STATS, FRAMES = utils.build_directories(PATH)
 
 with open(os.path.join(PATH,'output.txt'),'w') as f:
     f.write(f'gpu:{gpu}\n')
@@ -69,6 +68,7 @@ def train(hparams, model):
                            maximize=hparams.maximize,
                            weight_decay=hparams.L2
                            )
+    opt.zero_grad()
     
     #Initialize FB environment   
     FLAPPYBIRD = FlappyBird(rngSeed=hparams.seed)
@@ -88,20 +88,20 @@ def train(hparams, model):
         
         agent_score, num_pipes = 0, 0
         frames, actions, rewards, probs = [], [], [], []
-        lastFrame = np.zeros([72,100],dtype=float)
+        lastFrame = np.zeros([HEIGHT,WIDTH],dtype=float)
         
         #play a single game
         while not game.game_over():
             #retrieve current game state and process into tensor
             currentFrame = game.getScreenRGB()
-            frame_np = utils.processScreen(currentFrame)
+            frame_np = utils.processScreen(currentFrame,WIDTH,HEIGHT)[0,:,:]
             
             #choose the appropriate model and get our action
-            if hparams.model_type == 'PGNetwork':
+            if 'NET' in hparams.model_type.upper():
                 combined_np = np.subtract(frame_np,lastFrame).ravel()          #combine the current frame with the last frame, and flatten
                 frame_t = torch.from_numpy(combined_np).float().to(DEVICE)     #convert to a tensor
                 p = model(frame_t)
-            elif hparams.model_type == 'CNN_PG':
+            elif 'CNN' in hparams.model_type.upper():
                 stack_t = torch.stack([torch.from_numpy(frame_np).float(),torch.from_numpy(lastFrame).float()],0).to(DEVICE)
                 p = model(stack_t)
             else:
@@ -112,11 +112,12 @@ def train(hparams, model):
 
             #get the action to take
             p_up = p[0].clone().to(DEVICE) if hparams.softmax else p.clone().to(DEVICE)
-            if gpu=="MPS":
-                sample = torch.rand(1,dtype=torch.float32,generator=rng).to(DEVICE)
-            else:
-                sample = torch.rand(1,dtype=float,generator=rng).to(DEVICE)
-            action = ACTION_MAP['flap'] if sample <= p_up else ACTION_MAP['noop']   
+            # if gpu=="MPS":
+            #     sample = torch.rand(1,dtype=torch.float32,generator=rng).to(DEVICE)
+            # else:
+            #     sample = torch.rand(1,dtype=float,generator=rng).to(DEVICE)
+            # action = ACTION_MAP['flap'] if sample <= p_up else ACTION_MAP['noop'] 
+            action = ACTION_MAP['flap'] if .5 <= p_up else ACTION_MAP['noop']   
             
             #take the action
             reward = game.act(action)
@@ -135,11 +136,6 @@ def train(hparams, model):
         #update performance variables
         if num_pipes > best_score:
             string = ''
-            pickle.dump(frames,open(PATH+'/bestFrames.p','wb'))
-            try:
-                torch.save(model,PATH+'/bestModel.pt')
-            except TypeError:
-                string = 'CANNOT SAVE MODEL WTIH GENERATOR OBJECT\n'
             best_score = num_pipes
             best_episode = episode
             with open(os.path.join(PATH,'output.txt'),'a') as f:
@@ -151,10 +147,14 @@ def train(hparams, model):
         
         #calculate loss and do backprop
         prob_t = torch.stack(probs)         #create tensor of network outputs while preserving computational graph
-        logp = torch.sum(torch.log(prob_t))     #add all log probabilities in the episode
+        logp = torch.log(prob_t)            #add all log probabilities in the episode
         loss = torch.div(torch.mul(discounted_reward,logp), hparams.batch_size) #divide by number of samples (i.e. episodes in batch)
         
-        loss.backward()
+        try:
+            loss.backward()
+        except RuntimeError:
+            loss.sum().backward()
+
         #accumulate gradient over batch_size episodes
         if episode % hparams.batch_size == 0:
             opt.step()
@@ -191,22 +191,24 @@ def evaluate(hparams, model):
         
     num_pipes = 0
     frames = []
-    lastFrame = np.zeros([72,100],dtype=float)
-        
+    lastFrame = np.zeros([HEIGHT,WIDTH],dtype=float)
+    f = 0    
     #play a single game
     while not game.game_over():
+        f+=1
         #retrieve current game state and process into tensor
         currentFrame = game.getScreenRGB()
-        frame_np = utils.processScreen(currentFrame)
-            
+        frame_np = utils.processScreen(currentFrame,WIDTH,HEIGHT)[0,:,:]
+        plt.imsave(os.path.join(FRAMES,f'evaluate_{f}.png'),currentFrame)
+        
         #choose the appropriate model and get our action
-        if hparams.model_type == 'PGNetwork':
+        if 'NET' in hparams.model_type.upper():
             combined_np = np.subtract(frame_np,lastFrame).ravel()          #combine the current frame with the last frame, and flatten
             frame_t = torch.from_numpy(combined_np).float().to(DEVICE)     #convert to a tensor
-            p = model.evaluate(frame_t)
-        elif hparams.model_type == 'CNN_PG':
+            p = model(frame_t)
+        elif 'CNN' in hparams.model_type.upper():
             stack_t = torch.stack([torch.from_numpy(frame_np).float(),torch.from_numpy(lastFrame).float()],0).to(DEVICE)
-            p = model.evaluate(stack_t)
+            p = model(stack_t)
         else:
             raise Exception('Unsupported model type.')         
 
@@ -231,10 +233,10 @@ def evaluate(hparams, model):
 #############   Main
 
 #train a model
-if hparams.model_type == 'PGNetwork':
+if 'NET' in hparams.model_type.upper():
     model = models.PGNetwork(hparams,GRID_SIZE,OUTPUT,DEVICE).to(DEVICE)
-elif hparams.model_type == 'CNN_PG':
-    model = models.CNN_PG(hparams, w=100, h=72, outputSize=OUTPUT,DEVICE=DEVICE).to(DEVICE)
+elif 'CNN' in hparams.model_type.upper():
+    model = models.CNN_PG(hparams, w=WIDTH, h=HEIGHT, outputSize=OUTPUT,DEVICE=DEVICE).to(DEVICE)
 else:
     raise Exception('Unsupported model type.')  
 
