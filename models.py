@@ -114,7 +114,7 @@ class CNN_PG(torch.nn.Module):
         x = self.d4(self.activations[self.leaky](self.linear1(torch.flatten(x))))
         x = self.d5(self.activations[self.leaky](self.linear2(x)))
         if self.sigmoid:
-            x = torch.sigmoid(self.linear3(x))
+            x = torch.sigmoid(self.linear3(x)/self.temperature)
         else:
             x = self.activations[self.leaky](self.linear3(x))
         return x
