@@ -52,6 +52,5 @@ do
     done
 done
 comment
-echo "$JOB jobs submitted"
 
 
