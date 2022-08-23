@@ -2,7 +2,7 @@
 #SBATCH --mem=16G
 #SBATCH --partition=beards
 #SBATCH --gres=gpu:1
-#SBATCH --time=00-00:30:00
+#SBATCH --time=00-03:00:00
 
 . /etc/profile
 
@@ -30,10 +30,10 @@ python FBmain.py \
 --num_episodes=$NUM_EPS \
 --num_hiddens=200 \
 --temperature=$TEMP \
---L2=.0001 \
+--L2=0 \
 --learning_rate=$LR \
 --sigmoid=true \
 --leaky=$LEAKY \
 --model_type=$MODEL \
 --dropout_type=GAUSS \
---dropout=.5
+--dropout=0
