@@ -67,5 +67,5 @@ def discount_rewards(r, gamma):
 
 def processScreen(obs,w,h):
     image = cv2.cvtColor(cv2.resize(obs, (w,h)), cv2.COLOR_BGR2GRAY)
-    _, image = cv2.threshold(image, 100, 255, cv2.THRESH_BINARY)
+    # _, image = cv2.threshold(image, 100, 255, cv2.THRESH_BINARY)
     return image[None, :, :].astype(np.float32)
