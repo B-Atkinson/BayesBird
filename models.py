@@ -83,7 +83,11 @@ class CNN_PG(torch.nn.Module):
         self.temperature = torch.tensor(hparams.temperature if hparams.temperature > 0 else 1e-8, dtype=float)
         self.activations = {False:F.relu, True:F.leaky_relu}    #allows user to specify hidden activations
         
-        ch1,kSize1,pad1,stride1 = 32,8,3,4
+        #immediately apply batch normalization to normalize the input
+
+        #apply conv-batch norm- relu cell twice
+
+        ch1,kSize1,pad1,stride1 = 32,8,3,1
         self.conv1 = torch.nn.Conv2d(in_channels=2,out_channels=ch1, kernel_size=kSize1, padding=pad1, stride=stride1)
         w,h = self.__outSize(w,kSize=kSize1,padLength=pad1,stride=stride1), self.__outSize(h,kSize=kSize1,padLength=pad1,stride=stride1)  #output of conv1 is ch1 x w x h
         self.d1 = self.dropout_layer(hparams.dropout,hparams.seed,DEVICE)
@@ -97,6 +101,9 @@ class CNN_PG(torch.nn.Module):
         self.conv3 = torch.nn.Conv2d(in_channels=ch2,out_channels=ch3, kernel_size=kSize3, padding=pad3, stride=stride3)
         w,h = self.__outSize(w,kSize=kSize3,padLength=pad3,stride=stride3), self.__outSize(h,kSize=kSize3,padLength=pad3,stride=stride3)  #output of pool is ch1 x w x h
         self.d3 = self.dropout_layer(hparams.dropout,hparams.seed,DEVICE)
+        
+        #potentially utilize global average pooling here
+
 
         self.linear1 = torch.nn.Linear(ch3*w*h, 200)  #linear layer takes a 1D tensor length out_channels * w * h, requires flattened tensor
         self.d4 = self.dropout_layer(hparams.dropout,hparams.seed,DEVICE)
@@ -116,7 +123,7 @@ class CNN_PG(torch.nn.Module):
         if self.sigmoid:
             x = torch.sigmoid(self.linear3(x)/self.temperature)
         else:
-            x = self.activations[self.leaky](self.linear3(x))
+            x = self.linear3(x)
         return x
             
 
