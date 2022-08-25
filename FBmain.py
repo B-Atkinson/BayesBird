@@ -41,9 +41,9 @@ WIDTH = hparams.screenWidth     #if downsample by 4, w=72
 HEIGHT = hparams.screenHeight    #if downsample by 4, h=100
 GRID_SIZE = WIDTH * HEIGHT
 ACTION_MAP = {'flap': K_w,'noop': None}
-REWARDDICT = {"positive":2, "loss":-5}
+REWARDDICT = {"positive":1, "loss":-1}
 OUTPUT = 2 if hparams.softmax else 1
-PATH = hparams.output_dir + hparams.model_type +  f"-backwardDiscount-greedy"
+PATH = hparams.output_dir + hparams.model_type +  f"-forwardDiscountScalar-greedy-fullFrame"
 PATH, STATS, FRAMES = utils.build_directories(PATH)
 
 with open(os.path.join(PATH,'output.txt'),'w') as f:
@@ -62,7 +62,7 @@ if not hparams.render:
     os.environ['SDL_VIDEODRIVER'] = 'dummy'
 
 ###### Function definitions
-def train(hparams, model):
+def train(hparams, model,game):
     opt = torch.optim.Adam(params=model.parameters(),
                            lr=hparams.learning_rate,
                            maximize=hparams.maximize,
@@ -71,10 +71,10 @@ def train(hparams, model):
     opt.zero_grad()
     
     #Initialize FB environment   
-    FLAPPYBIRD = FlappyBird(rngSeed=hparams.seed)
-    game = PLE(FLAPPYBIRD, display_screen=hparams.render, force_fps=True, rng=hparams.seed, reward_values=REWARDDICT)
     game.init()
-    
+    WIDTH = 288
+    HEIGHT = 400    
+
     training_summaries = []
     best_score, best_episode = -1,0
     
@@ -88,13 +88,15 @@ def train(hparams, model):
         
         agent_score, num_pipes = 0, 0
         frames, actions, rewards, probs = [], [], [], []
-        lastFrame = np.zeros([HEIGHT,WIDTH],dtype=float)
+
+        lastFrame = np.zeros([WIDTH,HEIGHT],dtype=float)
         
         #play a single game
         while not game.game_over():
             #retrieve current game state and process into tensor
-            currentFrame = game.getScreenRGB()
-            frame_np = utils.processScreen(currentFrame,WIDTH,HEIGHT)[0,:,:]
+            currentFrame = game.getScreenGrayscale()
+            frame_np = currentFrame[:,:400]
+            # frame_np = utils.processScreen(currentFrame,WIDTH,HEIGHT)[0,:,:]
             
             #choose the appropriate model and get our action
             if 'NET' in hparams.model_type.upper():
@@ -177,10 +179,8 @@ def train(hparams, model):
 
 
 
-def evaluate(hparams, model):
+def evaluate(hparams, model,game):
     #Initialize FB environment   
-    FLAPPYBIRD = FlappyBird(rngSeed=hparams.seed+1)
-    game = PLE(FLAPPYBIRD, display_screen=hparams.render, force_fps=True, rng=hparams.seed+1, reward_values=REWARDDICT)
     game.init()
 
     with open(os.path.join(PATH,'output.txt'),'a') as f:
@@ -231,31 +231,34 @@ def evaluate(hparams, model):
     
 
 #############   Main
+FLAPPYBIRD = FlappyBird(rngSeed=hparams.seed)
+game = PLE(FLAPPYBIRD, display_screen=hparams.render, force_fps=True, rng=hparams.seed, reward_values=REWARDDICT)
+
 
 #train a model
 if 'NET' in hparams.model_type.upper():
     model = models.PGNetwork(hparams,GRID_SIZE,OUTPUT,DEVICE).to(DEVICE)
 elif 'CNN' in hparams.model_type.upper():
-    model = models.CNN_PG(hparams, w=WIDTH, h=HEIGHT, outputSize=OUTPUT,DEVICE=DEVICE).to(DEVICE)
+    model = models.CNN_PG(hparams, w=288, h=400, outputSize=OUTPUT,DEVICE=DEVICE).to(DEVICE)
 else:
     raise Exception('Unsupported model type.')  
 
 #evaulate the model resulting from full training length
-lastModel, (best_score, best_episode) = train(hparams,model)
+lastModel, (best_score, best_episode) = train(hparams,model,game)
 with open(os.path.join(PATH,'output.txt'),'a') as f:
     f.write(f'\ntraining completed\nbest score: {best_score} achieved at episode {best_episode}\n\nbeginning evaluation\n')
 print(f'\ntraining completed\nbest score: {best_score} achieved at episode {best_episode}\n\nbeginning evaluation\n',flush=True)
-num_pipes = evaluate(hparams,lastModel)
+num_pipes = evaluate(hparams,lastModel,game)
 with open(os.path.join(PATH,'output.txt'),'a') as f:
         f.write(f'\nlast model evaluation completed\nscore: {num_pipes}\n')
 
-#attempt to evaluate the best overall model from training
-try:
-    bestModel = torch.load(PATH+'/bestModel.pt',map_location=DEVICE)
-    num_pipes = evaluate(hparams,bestModel)
-    with open(os.path.join(PATH,'output.txt'),'a') as f:
-        f.write(f'\ntrue best evaluation completed\nscore: {num_pipes}\n')
-except:
-    with open(PATH+'/digest.txt','w') as f:
-        f.write(f'Unable to load best model\n')
+# #attempt to evaluate the best overall model from training
+# try:
+#     bestModel = torch.load(PATH+'/bestModel.pt',map_location=DEVICE)
+#     num_pipes = evaluate(hparams,bestModel,game)
+#     with open(os.path.join(PATH,'output.txt'),'a') as f:
+#         f.write(f'\ntrue best evaluation completed\nscore: {num_pipes}\n')
+# except:
+#     with open(PATH+'/digest.txt','w') as f:
+#         f.write(f'Unable to load best model\n')
 
