@@ -90,6 +90,9 @@ class CNN_PG(torch.nn.Module):
         kernels = [7,5,3]
         pads = [3,2,1]
 
+        if hparams.cells > len(kernels):
+            hparams.cells = len(kernels)
+
         for c in range(hparams.cells):
             self.layers.append( torch.nn.Sequential(torch.nn.Conv2d(in_channels=channels[c],out_channels=channels[c+1], kernel_size=kernels[c],padding=pads[c]),
                                                     self.activations[self.leaky])
