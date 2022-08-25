@@ -39,7 +39,7 @@ def make_argparser():
     parser.add_argument('--batch_size', type=int, default=20,
                         help="number of episodes to conduct rmsprop parameter updates over")
     parser.add_argument('--cells', type=int, default=2,
-                        help="number of Conv2d-BatchNorm-ReLu cells to use in CNN")
+                        help="number of Conv2d-BatchNorm-ReLu cells to use in CNN_PG")
     parser.add_argument('--dropout', type=float, default=0,
                         help="likelihood of a neuron to be dropped, as a decimal from [0,1)")
     parser.add_argument('--gamma', type=float, default=.99)
@@ -47,19 +47,19 @@ def make_argparser():
                         help="the number of hidden nodes to use in the network")
     parser.add_argument('--leaky', type=str2bool, default=False,
                         help="if True, use Leaky ReLu activation, else use ReLU")
-    parser.add_argument("--learning_rate", type=float, default=1e-2,
+    parser.add_argument("--learning_rate", type=float, default=1e-5,
                         help="specify the base learning rate for the model")
-    parser.add_argument('--L2', type=float, default=1e-3,
+    parser.add_argument('--L2', type=float, default=1e-2,
                         help='amount to decay weights for L2 penalty in Adam')
-    parser.add_argument('--num_hiddens', type=int, default=2,
-                        help="number of hidden linear layers to use")     
+    parser.add_argument('--num_hiddens', type=int, default=200,
+                        help="number of hidden linear layers to use in PG_Network")     
     parser.add_argument('--optim', type=str, default='Adam',
                         help='String specifying the type of optimizer to be used.')
     parser.add_argument('--sigmoid', type=str2bool, default=True,
                         help="if True, uses sigmoid activation for output layer of network")
     parser.add_argument('--softmax', type=str2bool, default=False,
                         help="if True, uses softmax activation for output layer of network")
-    parser.add_argument("--temperature", type=float, default=100000,
+    parser.add_argument("--temperature", type=float, default=1,
                         help="the temperature value used to modify input to the sigmoid activation \
                             function. must be greater than 0")
     
