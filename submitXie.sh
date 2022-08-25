@@ -8,22 +8,24 @@ HIDDENS=4
 
 for LR in .00001 .0001
 do
+    for L2 in .01 .001
+    do
+        screen -dm python /Users/student/Documents/brian/BayesBird/FBmain.py \
+        --model_type=CNN_PG \
+        --seed=$SEED \
+        --output_dir=$OUTPUT \
+        --num_episodes=$NUM_EPS \
+        --num_hiddens=$HIDDENS \
+        --cells=3 \
+        --batch_size=20 \
+        --L2=$L2 \
+        --learning_rate=$LR \
+        --leaky=false \
+        --sigmoid=true \
+        --temperature=1
 
-screen -dm python /Users/student/Documents/brian/BayesBird/FBmain.py \
---model_type=CNN_PG \
---seed=$SEED \
---output_dir=$OUTPUT \
---num_episodes=$NUM_EPS \
---num_hiddens=$HIDDENS \
---batch_size=20 \
---L2=.01 \
---learning_rate=$LR \
---leaky=false \
---sigmoid=true \
---temperature=1
-
-let JOB=JOB+1
-
+        let JOB=JOB+1
+    done
 done
 
 echo "Jobs submitted: $JOB"
