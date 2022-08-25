@@ -20,31 +20,31 @@ def build_directories(PATH):
     print('Saving to: ' + PATH,flush=True)
     return PATH, STATS, FRAMES
     
-# def discount_rewards(r, gamma):
-#     """ take 1D float array of rewards and compute discounted reward. known as weirdDiscount"""
-#     discounts = np.zeros(r.size,dtype=float)
-#     for t in range(0, r.size):
-#         #discounted reward at this step = (discount_factor * running_sum last step) + reward for this step
-#         discounts[t] =  (gamma**t) * r[t]
-#     #return sum of discounted reward vector
-#     return sum(discounts)
-
 def discount_rewards(r, gamma):
-    # This function performs discounting of rewards by going back
-    # and punishing or rewarding based upon final outcome of episode
-    # known as backwardDiscount
-    disc_r = np.zeros_like(r, dtype=float)
-    running_sum = 0
-    for t in reversed(range(0, len(r))):
-        if r[t] == -1:  # If the reward is -1...
-            running_sum = 0  # ...then reset sum, since it's a game boundary
-        running_sum = running_sum * gamma + r[t]
-        disc_r[t] = running_sum
+    """ take 1D float array of rewards and compute discounted reward. known as forwardDiscount"""
+    discounts = np.zeros(r.size,dtype=float)
+    for t in range(0, r.size):
+        #discounted reward at this step = (discount_factor * running_sum last step) + reward for this step
+        discounts[t] =  (gamma**t) * r[t]
+    #return sum of discounted reward vector
+    return sum(discounts)
 
-    # Here we normalise with respect to mean and standard deviation:
-    discounted_rewards = (disc_r - disc_r.mean()) / (disc_r.std() + np.finfo(float).eps)
-    # Note that we add eps in the rare case that the std is 0
-    return discounted_rewards
+# def discount_rewards(r, gamma):
+#     # This function performs discounting of rewards by going back
+#     # and punishing or rewarding based upon final outcome of episode
+#     # known as backwardDiscount
+#     disc_r = np.zeros_like(r, dtype=float)
+#     running_sum = 0
+#     for t in reversed(range(0, len(r))):
+#         if r[t] == -1:  # If the reward is -1...
+#             running_sum = 0  # ...then reset sum, since it's a game boundary
+#         running_sum = running_sum * gamma + r[t]
+#         disc_r[t] = running_sum
+
+#     # Here we normalise with respect to mean and standard deviation:
+#     discounted_rewards = (disc_r - disc_r.mean()) / (disc_r.std() + np.finfo(float).eps)
+#     # Note that we add eps in the rare case that the std is 0
+#     return discounted_rewards
 
 # def processScreen(obs):
 #     '''Takes as input a 512x288x3 numpy ndarray and downsamples it twice to get a 100x72 output array. Usless background 
