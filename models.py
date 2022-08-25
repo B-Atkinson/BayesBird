@@ -84,33 +84,39 @@ class CNN_PG(torch.nn.Module):
         self.activations = {False:torch.nn.ReLU(), True:torch.nn.LeakyReLU()}    #allows user to specify hidden activations
         
         #immediately apply batch normalization to normalize the input
-        self.norm1 = torch.nn.BatchNorm1d(h)
+        self.norm1 = torch.nn.BatchNorm1d(w)
         self.layers = torch.nn.ModuleList()
-        channels = [2,32,64,64]
+        channels = [2,64,64,64]
         kernels = [7,5,3]
+        pads = [3,2,1]
 
         for c in range(hparams.cells):
-            self.layers.append( torch.nn.Sequential(torch.nn.Conv2d(in_channels=channels[c],out_channels=channels[c+1], kernel_size=kernels[c]), 
-                                                    torch.nn.BatchNorm1d(channels[c]),
+            self.layers.append( torch.nn.Sequential(torch.nn.Conv2d(in_channels=channels[c],out_channels=channels[c+1], kernel_size=kernels[c],padding=pads[c]),
                                                     self.activations[self.leaky])
                                                     )
             w,h = self.__outSize((w,h),kernels[c])  #shape after batch norm layer
             
-        self.layers.append( torch.nn.AvgPool2d(4) )
-        w,h = self.__poolSize((w,h),kSize=4)
+        self.globPool = torch.nn.AvgPool2d(kernel_size=(w,h)) 
+        w,h = self.__poolSize((w,h),kSize=(w,h))
         
         #potentially utilize global average pooling here
 
-        self.layers.append( torch.nn.Linear(channels[hparams.cells-1]*w*h, 1) )  #linear layer takes a 1D tensor length out_channels * w * h, requires flattened tensor
+        self.linear =  torch.nn.Linear(channels[hparams.cells-1]*w*h, 1)   #linear layer takes a 1D tensor length out_channels * w * h, requires flattened tensor
 
     def forward(self,x):
         #utilize dropout during training
         x = self.norm1(x)
-
+        skip = False
         for layer in self.layers:
-            x = layer(x)
+            if skip:
+                x = layer(x) + x
+            else:
+                x = layer(x)    
+            skip = True
+        x = self.globPool(x)
+        x = self.linear(x.squeeze())
         if self.sigmoid:
-            x = torch.sigmoid(self.linear3(x)/self.temperature)
+            x = torch.sigmoid(x/self.temperature)
         return x
             
 
@@ -128,8 +134,8 @@ class CNN_PG(torch.nn.Module):
 
     def __poolSize(self,inputSize,kSize,padLength=0,stride=None):
         if stride==None:
-            stride=kSize
-        return floor( ((inputSize[0] + 2*padLength - kSize)/stride)+1 ), floor( ((inputSize[1] + 2*padLength - kSize)/stride)+1 )
+            return floor( ((inputSize[0] + 2*padLength - kSize[0])/kSize[0])+1 ), floor( ((inputSize[1] + 2*padLength - kSize[1])/kSize[1])+1 )
+        return floor( ((inputSize[0] + 2*padLength - kSize[0])/stride)+1 ), floor( ((inputSize[1] + 2*padLength - kSize[1])/stride)+1 )
 
 class GaussianDropout(torch.nn.Module):
     '''Applies noise to every element of the input tensor from sampling a mean=1, stddev=p/(1-p) Normal
