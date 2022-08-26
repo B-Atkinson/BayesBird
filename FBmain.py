@@ -142,8 +142,8 @@ def train(hparams, model,game):
             best_episode = episode
             with open(os.path.join(PATH,'output.txt'),'a') as f:
                 f.write(f'\n{string}new high score:{best_score} episode:{best_episode}\n')
+            torch.save(model.state_dict(), os.path.join(PATH,'best_model.pt'))
         training_summaries.append( (episode, num_pipes) )
-        
         stacked_rewards = np.vstack(rewards)
         discounted_reward = torch.tensor(utils.discount_rewards(stacked_rewards, hparams.gamma)).float().to(DEVICE) 
         
@@ -248,17 +248,17 @@ lastModel, (best_score, best_episode) = train(hparams,model,game)
 with open(os.path.join(PATH,'output.txt'),'a') as f:
     f.write(f'\ntraining completed\nbest score: {best_score} achieved at episode {best_episode}\n\nbeginning evaluation\n')
 print(f'\ntraining completed\nbest score: {best_score} achieved at episode {best_episode}\n\nbeginning evaluation\n',flush=True)
-num_pipes = evaluate(hparams,lastModel,game)
-with open(os.path.join(PATH,'output.txt'),'a') as f:
-        f.write(f'\nlast model evaluation completed\nscore: {num_pipes}\n')
+# num_pipes = evaluate(hparams,lastModel,game)
+# with open(os.path.join(PATH,'output.txt'),'a') as f:
+#         f.write(f'\nlast model evaluation completed\nscore: {num_pipes}\n')
 
-# #attempt to evaluate the best overall model from training
-# try:
-#     bestModel = torch.load(PATH+'/bestModel.pt',map_location=DEVICE)
-#     num_pipes = evaluate(hparams,bestModel,game)
-#     with open(os.path.join(PATH,'output.txt'),'a') as f:
-#         f.write(f'\ntrue best evaluation completed\nscore: {num_pipes}\n')
-# except:
-#     with open(PATH+'/digest.txt','w') as f:
-#         f.write(f'Unable to load best model\n')
+#attempt to evaluate the best overall model from training
+try:
+    bestModel = model.load_state_dict(torch.load(os.path.join(PATH,'best_model.pt')))
+    num_pipes = evaluate(hparams,bestModel,game)
+    with open(os.path.join(PATH,'output.txt'),'a') as f:
+        f.write(f'\ntrue best evaluation completed\nscore: {num_pipes}\n')
+except:
+    with open(PATH+'/digest.txt','w') as f:
+        f.write(f'Unable to load best model\n')
 
