@@ -6,7 +6,7 @@ JOB=0
 SEED=1
 HIDDENS=4
 
-for LR in .00001 .0001
+for LR in .00001
 do
     for L2 in .01 .001
     do
