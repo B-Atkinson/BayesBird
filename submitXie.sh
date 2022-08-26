@@ -16,7 +16,7 @@ do
         --output_dir=$OUTPUT \
         --num_episodes=$NUM_EPS \
         --num_hiddens=$HIDDENS \
-        --cells=3 \
+        --cells=2 \
         --batch_size=20 \
         --L2=$L2 \
         --learning_rate=$LR \

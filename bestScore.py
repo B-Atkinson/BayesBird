@@ -1,7 +1,7 @@
 import pathlib
 import os
 
-path = '/home/brian.atkinson/Bayes/data'
+path = '/home/brian.atkinson/Bayes/data/PenaltyTestSearch'
 dataDir = pathlib.Path(path) if not isinstance(path,pathlib.PosixPath) else path
 
 best_episode = -1
