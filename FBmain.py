@@ -75,6 +75,8 @@ def train(hparams, model,game):
     WIDTH = 288
     HEIGHT = 400    
 
+    frame_mean, frame_std = utils.frameBurnIn(game,hparams,model,WIDTH,HEIGHT,DEVICE,gpu)
+
     training_summaries = []
     best_score, best_episode = -1,0
     
@@ -96,16 +98,17 @@ def train(hparams, model,game):
             #retrieve current game state and process into tensor
             currentFrame = game.getScreenGrayscale()
             frame_np = currentFrame[:,:400]
-            # frame_np = utils.processScreen(currentFrame,WIDTH,HEIGHT)[0,:,:]
+            
             
             #choose the appropriate model and get our action
             if 'NET' in hparams.model_type.upper():
-                combined_np = np.subtract(frame_np,lastFrame).ravel()          #combine the current frame with the last frame, and flatten
+                combined_np = utils.processScreen(np.subtract(frame_np,lastFrame).ravel(),frame_mean,frame_std)          #combine the current frame with the last frame, and flatten
                 frame_t = torch.from_numpy(combined_np).float().to(DEVICE)     #convert to a tensor
                 p = model(frame_t)
             elif 'CNN' in hparams.model_type.upper():
-                stack_t = torch.stack([torch.from_numpy(frame_np).float(),torch.from_numpy(lastFrame).float()],0).to(DEVICE)
-                p = model(stack_t)
+                frame_stack = np.stack([frame_np,lastFrame],0)
+                frame_t = torch.from_numpy(utils.processScreen(frame_stack,frame_mean,frame_std)).float().to(DEVICE)
+                p = model(frame_t)
             else:
                 raise Exception('Unsupported model type.')         
 
@@ -114,12 +117,11 @@ def train(hparams, model,game):
 
             #get the action to take
             p_up = p[0].clone().to(DEVICE) if hparams.softmax else p.clone().to(DEVICE)
-            # if gpu=="MPS":
-            #     sample = torch.rand(1,dtype=torch.float32,generator=rng).to(DEVICE)
-            # else:
-            #     sample = torch.rand(1,dtype=float,generator=rng).to(DEVICE)
-            # action = ACTION_MAP['flap'] if sample <= p_up else ACTION_MAP['noop'] 
-            action = ACTION_MAP['flap'] if .5 <= p_up else ACTION_MAP['noop']   
+            if gpu=="MPS":
+                sample = torch.rand(1,dtype=torch.float32,generator=rng).to(DEVICE)
+            else:
+                sample = torch.rand(1,dtype=float,generator=rng).to(DEVICE)
+            action = ACTION_MAP['flap'] if sample <= p_up else ACTION_MAP['noop'] 
             
             #take the action
             reward = game.act(action)
@@ -142,7 +144,7 @@ def train(hparams, model,game):
             best_episode = episode
             with open(os.path.join(PATH,'output.txt'),'a') as f:
                 f.write(f'\n{string}new high score:{best_score} episode:{best_episode}\n')
-            torch.save(model.state_dict(), os.path.join(PATH,'best_model.pt'))
+            torch.save(model.state_dict(), os.path.join(PATH,'best_model.pt'),pickle_protocol=4)
         training_summaries.append( (episode, num_pipes) )
         stacked_rewards = np.vstack(rewards)
         discounted_reward = torch.tensor(utils.discount_rewards(stacked_rewards, hparams.gamma)).float().to(DEVICE) 
@@ -182,6 +184,7 @@ def train(hparams, model,game):
 def evaluate(hparams, model,game):
     #Initialize FB environment   
     game.init()
+    frame_mean, frame_std = utils.frameBurnIn(game,hparams,model,WIDTH,HEIGHT,DEVICE,gpu)
 
     with open(os.path.join(PATH,'output.txt'),'a') as f:
         f.write(f'commencing evaluation\n')
@@ -197,18 +200,21 @@ def evaluate(hparams, model,game):
     while not game.game_over():
         f+=1
         #retrieve current game state and process into tensor
-        currentFrame = game.getScreenRGB()
-        frame_np = utils.processScreen(currentFrame,WIDTH,HEIGHT)[0,:,:]
-        plt.imsave(os.path.join(FRAMES,f'evaluate_{f}.png'),currentFrame)
+        prettyFrame = game.getScreenRGB()
+        plt.imsave(os.path.join(FRAMES,f'evaluate_{f}.png'),prettyFrame)
+        currentFrame = game.getScreenGrayscale()
+        frame_np = currentFrame[:,:400]
+        
         
         #choose the appropriate model and get our action
         if 'NET' in hparams.model_type.upper():
-            combined_np = np.subtract(frame_np,lastFrame).ravel()          #combine the current frame with the last frame, and flatten
+            combined_np = utils.processScreen(np.subtract(frame_np,lastFrame).ravel(),frame_mean,frame_std)          #combine the current frame with the last frame, and flatten
             frame_t = torch.from_numpy(combined_np).float().to(DEVICE)     #convert to a tensor
             p = model(frame_t)
         elif 'CNN' in hparams.model_type.upper():
-            stack_t = torch.stack([torch.from_numpy(frame_np).float(),torch.from_numpy(lastFrame).float()],0).to(DEVICE)
-            p = model(stack_t)
+            frame_np = np.stack([frame_np,lastFrame],0)
+            frame_t = torch.from_numpy(utils.processScreen(frame_np,frame_mean,frame_std)).float().to(DEVICE)
+            p = model(frame_t)
         else:
             raise Exception('Unsupported model type.')         
 
