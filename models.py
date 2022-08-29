@@ -35,7 +35,7 @@ class PGNetwork(torch.nn.Module):
         if hparams.num_hiddens <= 1:
             self.layers.append( torch.nn.Linear(self.hiddenSize, outputSize) )
         else:
-            for lyr in range(2,hparams.num_hiddens+1):
+            for _ in range(2,hparams.num_hiddens+1):
                 self.layers.append( torch.nn.Linear(self.hiddenSize, self.hiddenSize) )
                 self.layers.append( self.dropout_layer(hparams.dropout,hparams.seed,DEVICE) )
             self.layers.append( torch.nn.Linear(self.hiddenSize, outputSize) )
@@ -52,11 +52,6 @@ class PGNetwork(torch.nn.Module):
         p = self.layers[self.num_layers-1](x)
         if self.sigmoid:
             p = torch.sigmoid(p / self.temperature)
-        elif self.softmax:
-            if self.outputSize > 1:
-                p = F.softmax(p)
-            else:
-                raise Exception('Softmax requires output size >1 to be useful')
         return p
 
     def evaluate(self,x,m=10):
@@ -73,51 +68,47 @@ class CNN_PG(torch.nn.Module):
         super(CNN_PG,self).__init__()
         self.leaky = hparams.leaky
         self.sigmoid = hparams.sigmoid
-        self.num_layers = hparams.num_hiddens
-        self.hiddenSize = hparams.hidden
         self.outputSize = outputSize
         self.DEVICE = DEVICE
+        self.temperature = torch.tensor(hparams.temperature if hparams.temperature > 0 else 1e-8, dtype=float)
         self.dropout_layer = GaussianDropout if 'GAUSS' in hparams.dropout_type.upper() else BernoulliDropout
+        self.activations = {False:torch.nn.ReLU(), True:torch.nn.LeakyReLU()}    #allows user to specify hidden activations
 
         #layer definitions
-        self.temperature = torch.tensor(hparams.temperature if hparams.temperature > 0 else 1e-8, dtype=float)
-        self.activations = {False:torch.nn.ReLU(), True:torch.nn.LeakyReLU()}    #allows user to specify hidden activations
-        
-        #immediately apply batch normalization to normalize the input
-        self.norm1 = torch.nn.BatchNorm1d(w)
         self.layers = torch.nn.ModuleList()
-        channels = [2,64,64,64]
-        kernels = [7,5,3]
-        pads = [3,2,1]
 
-        if hparams.cells > len(kernels):
-            hparams.cells = len(kernels)
+        if hparams.cells < 1:
+            hparams.cells = 2
 
-        for c in range(hparams.cells):
-            self.layers.append( torch.nn.Sequential(torch.nn.Conv2d(in_channels=channels[c],out_channels=channels[c+1], kernel_size=kernels[c],padding=pads[c]),
+        firstLayer = True
+        for _ in range(hparams.cells):
+            if not firstLayer:
+                self.layers.append( torch.nn.Sequential(torch.nn.Conv2d(in_channels=64,out_channels=64, kernel_size=5,padding=2),
                                                     self.activations[self.leaky])
                                                     )
-            w,h = self.__outSize((w,h),kernels[c])  #shape after batch norm layer
-            
-        self.globPool = torch.nn.AvgPool2d(kernel_size=(w,h)) 
-        w,h = self.__poolSize((w,h),kSize=(w,h))
-        
-        #potentially utilize global average pooling here
+            else:
+                self.layers.append( torch.nn.Sequential(torch.nn.Conv2d(in_channels=2,out_channels=64, kernel_size=5,padding=2),
+                                                    self.activations[self.leaky])
+                                                    )
+                firstLayer = False
+            w,h = self.__outSize((w,h),kSize=5,padLength=2)  #shape after batch norm layer
 
-        self.linear =  torch.nn.Linear(channels[hparams.cells-1]*w*h, 1)   #linear layer takes a 1D tensor length out_channels * w * h, requires flattened tensor
+        self.linear1 =  torch.nn.Sequential(torch.nn.Linear(64*w*h, 100), 
+                                            self.activations[self.leaky] 
+                                            )  #linear layer takes a 1D tensor length: out_channels * w * h, requires flattened tensor
+        self.linear2 = torch.nn.Linear(100,1)
 
     def forward(self,x):
         #utilize dropout during training
-        x = self.norm1(x)
         skip = False
         for layer in self.layers:
             if skip:
                 x = layer(x) + x
             else:
                 x = layer(x)    
-            skip = True
-        x = self.globPool(x)
-        x = self.linear(x.squeeze())
+                skip = True
+        x = self.linear1(torch.flatten(x))
+        x = self.linear2(x)
         if self.sigmoid:
             x = torch.sigmoid(x/self.temperature)
         return x
