@@ -36,7 +36,7 @@ def make_argparser():
     
     
     #hyperparameters
-    parser.add_argument('--batch_size', type=int, default=20,
+    parser.add_argument('--batch_size', type=int, default=200,
                         help="number of episodes to conduct rmsprop parameter updates over")
     parser.add_argument('--cells', type=int, default=2,
                         help="number of Conv2d-BatchNorm-ReLu cells to use in CNN_PG")
@@ -47,7 +47,7 @@ def make_argparser():
                         help="the number of hidden nodes to use in the network")
     parser.add_argument('--leaky', type=str2bool, default=False,
                         help="if True, use Leaky ReLu activation, else use ReLU")
-    parser.add_argument("--learning_rate", type=float, default=1e-5,
+    parser.add_argument("--learning_rate", type=float, default=1e-4,
                         help="specify the base learning rate for the model")
     parser.add_argument('--L2', type=float, default=1e-2,
                         help='amount to decay weights for L2 penalty in Adam')
@@ -70,12 +70,12 @@ def make_argparser():
     parser.add_argument('--maximize', type=str2bool, default=True,\
                         help="if True, Adam will maximize the objective function. Not implemented for RMSprop")
     parser.add_argument('--model_type', type=str, default='CNN',
-                        help="can be PGNetwork or NoisyPG")
+                        help="can be PGNetwork or CNN")
     parser.add_argument('--num_episodes', type=int, default=15000,
                         help="the number of episodes to train the agent on")
     parser.add_argument('--save_stats', type=int, default=200,
                         help="specifies the number of episodes to wait until saving network parameters, training summaries, and moves")
-    parser.add_argument('--screenHeight', type=int, default=512,
+    parser.add_argument('--screenHeight', type=int, default=400,
                         help="size of post-processed screen, default 100 is downsampled 4x")
     parser.add_argument('--screenWidth', type=int, default=288,
                         help="size of post-processed screen, default 72 is downsampled 4x")
