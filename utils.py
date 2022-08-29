@@ -1,3 +1,4 @@
+from inspect import currentframe
 import numpy as np
 import os
 import cv2
@@ -35,13 +36,13 @@ def discount_rewards(r, gamma):
     disc_r = np.zeros_like(r, dtype=float)
     running_sum = 0
     for t in reversed(range(0, len(r))):
-        if r[t] != 0:  # If the reward is -1...
+        if r[t] == -1:  # If the reward is -1...
             running_sum = 0  # ...then reset sum, since it's a game boundary
         running_sum = running_sum * gamma + r[t]
         disc_r[t] = running_sum
 
     # Note that we add eps in the rare case that the std is 0
-    return disc_r
+    return sum(disc_r)
 
 # def processScreen(obs):
 #     '''Takes as input a 512x288x3 numpy ndarray and downsamples it twice to get a 100x72 output array. Usless background 
@@ -62,7 +63,45 @@ def discount_rewards(r, gamma):
 #                 obs[i,j] = 1
 #     return obs.astype(np.float)
 
-def processScreen(obs,w,h):
-    image = cv2.cvtColor(cv2.resize(obs, (w,h)), cv2.COLOR_BGR2GRAY)
-    # _, image = cv2.threshold(image, 100, 255, cv2.THRESH_BINARY)
-    return image[None, :, :].astype(np.float32)
+def processScreen(obs,mean,std):
+    return (obs - mean) / std
+
+def frameBurnIn(game,hparams,model,WIDTH,HEIGHT,DEVICE,gpu,burnIn=3):
+    from pygame.constants import K_w
+    import torch
+    ACTION_MAP = {'flap': K_w,'noop': None}
+    frames = []
+    for _ in range(burnIn):
+        game.reset_game()
+        lastFrame = np.zeros([WIDTH,HEIGHT],dtype=float)
+        gameFrames = []
+        while not game.game_over():
+            currentFrame = game.getScreenGrayscale()
+            frame_np = currentFrame[:,:400]
+
+            #choose the appropriate model and get our action
+            if 'NET' in hparams.model_type.upper():
+                combined_np = np.subtract(frame_np,lastFrame).ravel()          #combine the current frame with the last frame, and flatten
+                frame_t = torch.from_numpy(combined_np).float().to(DEVICE)     #convert to a tensor
+                p = model(frame_t)
+            elif 'CNN' in hparams.model_type.upper():
+                frame_t = torch.stack([torch.from_numpy(frame_np).float(),torch.from_numpy(lastFrame).float()],0).to(DEVICE)
+                p = model(frame_t)
+            else:
+                raise Exception('Unsupported model type.') 
+            #update last frame array
+            lastFrame = np.copy(frame_np)
+            #get the action to take
+            p_up = p[0].clone().to(DEVICE) if hparams.softmax else p.clone().to(DEVICE)
+            if gpu=="MPS":
+                sample = torch.rand(1,dtype=torch.float32).to(DEVICE)
+            else:
+                sample = torch.rand(1,dtype=float).to(DEVICE)
+            action = ACTION_MAP['flap'] if sample <= p_up else ACTION_MAP['noop'] 
+            _ = game.act(action)
+            gameFrames.append(frame_t.cpu().numpy())
+        gameFrames.pop(0)      #throw away first frame because of initialization
+        frames.extend(gameFrames)
+
+    frames = np.array(frames,dtype=float)
+    return np.mean(frames), np.std(frames)
