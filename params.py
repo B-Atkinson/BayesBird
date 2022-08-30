@@ -45,6 +45,8 @@ def make_argparser():
     parser.add_argument('--gamma', type=float, default=.99)
     parser.add_argument('--hidden', type=int, default=200,
                         help="the number of hidden nodes to use in the network")
+    parser.add_argument('--init_method', type=str, default='Null',
+                        help='specify if weights should be initialized with torch default initialization, Xavier_uniform, Xavier_normal, or He initialization')
     parser.add_argument('--leaky', type=str2bool, default=False,
                         help="if True, use Leaky ReLu activation, else use ReLU")
     parser.add_argument("--learning_rate", type=float, default=1e-4,
@@ -71,7 +73,7 @@ def make_argparser():
                         help="if True, Adam will maximize the objective function. Not implemented for RMSprop")
     parser.add_argument('--model_type', type=str, default='CNN',
                         help="can be PGNetwork or CNN")
-    parser.add_argument('--num_episodes', type=int, default=15000,
+    parser.add_argument('--num_episodes', type=int, default=200,
                         help="the number of episodes to train the agent on")
     parser.add_argument('--save_stats', type=int, default=200,
                         help="specifies the number of episodes to wait until saving network parameters, training summaries, and moves")
