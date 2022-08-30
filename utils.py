@@ -15,7 +15,8 @@ def build_directories(PATH):
         from time import time
         PATH += "_"+str(time())[-4:]
 
-    FRAMES = os.makedirs(os.path.join(PATH,'frames'),exist_ok=True)
+    os.makedirs(os.path.join(PATH,'frames'),exist_ok=True)
+    FRAMES = os.path.join(PATH,'frames')
     STATS = PATH+"/stats.csv"
     os.makedirs(os.path.dirname(PATH+'/metadata.txt'), exist_ok=True)
     print('Saving to: ' + PATH,flush=True)
