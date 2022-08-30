@@ -4,11 +4,10 @@ OUTPUT=/Users/student/Documents/brian/data/MLPTest/
 NUM_EPS=30000
 JOB=0
 SEED=1
-HIDDENS=4
 
 for LR in 1e-4 1e-5
 do
-    for L2 in .001
+    for HIDDENS in 2 3 4
     do
         screen -dm python /Users/student/Documents/brian/BayesBird/FBmain.py \
         --model_type=PGNetwork \
@@ -18,7 +17,7 @@ do
         --num_hiddens=$HIDDENS \
         --cells=2 \
         --batch_size=200 \
-        --L2=$L2 \
+        --L2=.01 \
         --learning_rate=$LR \
         --leaky=false \
         --sigmoid=true \
