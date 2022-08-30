@@ -194,29 +194,32 @@ def evaluate(hparams, model,game):
         
     num_pipes = 0
     frames = []
-    lastFrame = np.zeros([HEIGHT,WIDTH],dtype=float)
+    lastFrame = np.zeros([WIDTH,HEIGHT],dtype=float)
     f = 0    
     #play a single game
     while not game.game_over():
         f+=1
-        #retrieve current game state and process into tensor
+        #retrieve current game state in RGB for movie-making
         prettyFrame = game.getScreenRGB()
         plt.imsave(os.path.join(FRAMES,f'evaluate_{f}.png'),prettyFrame)
-        currentFrame = game.getScreenGrayscale()
-        frame_np = currentFrame[:,:400]
         
+        #retrieve current game state and process into tensor
+        currentFrame = game.getScreenGrayscale()
+        frame_np = cv2.resize(currentFrame[:,:400], (HEIGHT,WIDTH))
         
         #choose the appropriate model and get our action
         if 'NET' in hparams.model_type.upper():
-            combined_np = utils.processScreen(np.subtract(frame_np,lastFrame).ravel(),frame_mean,frame_std)          #combine the current frame with the last frame, and flatten
+            combined_np = utils.processScreen(np.subtract(frame_np,lastFrame),frame_mean,frame_std).ravel()          #combine the current frame with the last frame, and flatten
             frame_t = torch.from_numpy(combined_np).float().to(DEVICE)     #convert to a tensor
             p = model(frame_t)
         elif 'CNN' in hparams.model_type.upper():
-            frame_np = np.stack([frame_np,lastFrame],0)
-            frame_t = torch.from_numpy(utils.processScreen(frame_np,frame_mean,frame_std)).float().to(DEVICE)
+            frame_stack = np.stack([frame_np,lastFrame],0)
+            # processed = np.concatenate([utils.processScreen(frame_stack,frame_mean,frame_std),np.zeros((WIDTH,HEIGHT,1))],2)
+            # plt.imshow(processed)
+            frame_t = torch.from_numpy(utils.processScreen(frame_stack,frame_mean,frame_std)).float().to(DEVICE)
             p = model(frame_t)
         else:
-            raise Exception('Unsupported model type.')         
+            raise Exception('Unsupported model type.')      
 
         #update last frame array
         lastFrame = np.copy(frame_np)
@@ -254,17 +257,17 @@ lastModel, (best_score, best_episode) = train(hparams,model,game)
 with open(os.path.join(PATH,'output.txt'),'a') as f:
     f.write(f'\ntraining completed\nbest score: {best_score} achieved at episode {best_episode}\n\nbeginning evaluation\n')
 print(f'\ntraining completed\nbest score: {best_score} achieved at episode {best_episode}\n\nbeginning evaluation\n',flush=True)
-# num_pipes = evaluate(hparams,lastModel,game)
-# with open(os.path.join(PATH,'output.txt'),'a') as f:
-#         f.write(f'\nlast model evaluation completed\nscore: {num_pipes}\n')
 
 #attempt to evaluate the best overall model from training
 try:
-    bestModel = model.load_state_dict(torch.load(os.path.join(PATH,'best_model.pt')))
-    num_pipes = evaluate(hparams,bestModel,game)
+    model.load_state_dict(torch.load(os.path.join(PATH,'best_model.pt')))
+    game = FLAPPYBIRD = FlappyBird(rngSeed=hparams.seed+10)
+    game = PLE(FLAPPYBIRD, display_screen=hparams.render, force_fps=True, rng=hparams.seed+10, reward_values=REWARDDICT)
+    num_pipes = evaluate(hparams,model,game)
     with open(os.path.join(PATH,'output.txt'),'a') as f:
-        f.write(f'\ntrue best evaluation completed\nscore: {num_pipes}\n')
-except:
-    with open(PATH+'/digest.txt','w') as f:
+        f.write(f'\nevaluation completed\nscore: {num_pipes}\n')
+except Exception as e:
+    print(e)
+    with open(PATH+'/output.txt','w') as f:
         f.write(f'Unable to load best model\n')
 
