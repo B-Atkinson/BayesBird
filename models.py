@@ -28,8 +28,11 @@ class PGNetwork(torch.nn.Module):
         self.temperature = torch.tensor(hparams.temperature if hparams.temperature > 0 else 1e-8, dtype=float)
         self.activations = {False:F.relu, True:F.leaky_relu}    #allows user to specify hidden activations
         self.layers = torch.nn.ModuleList()                     #this will store the layers of the network
+        
+        gain = torch.nn.init.calculate_gain('leaky_relu' if self.leaky else 'relu')
+        init_method = {'He':torch.nn.init.kaiming_uniform_, 'Xavier_normal':torch.nn.init.xavier_normal_,'Xavier_uniform':torch.nn.init.xavier_uniform_}
 
-        self.layers.append( torch.nn.Linear(inputSize, self.hiddenSize) )
+        self.layers.append( torch.nn.Linear(inputSize, self.hiddenSize)) 
         self.layers.append( self.dropout_layer(hparams.dropout,hparams.seed,DEVICE) )
 
         if hparams.num_hiddens <= 1:
