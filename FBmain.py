@@ -12,6 +12,7 @@ import params
 import utils
 import models
 from matplotlib import pyplot as plt
+import cv2
 
 
 
@@ -71,9 +72,7 @@ def train(hparams, model,game):
     opt.zero_grad()
     
     #Initialize FB environment   
-    game.init()
-    WIDTH = 288
-    HEIGHT = 400    
+    game.init()   
 
     frame_mean, frame_std = utils.frameBurnIn(game,hparams,model,WIDTH,HEIGHT,DEVICE,gpu)
 
@@ -97,16 +96,17 @@ def train(hparams, model,game):
         while not game.game_over():
             #retrieve current game state and process into tensor
             currentFrame = game.getScreenGrayscale()
-            frame_np = currentFrame[:,:400]
-            
+            frame_np = cv2.resize(currentFrame[:,:400], (HEIGHT,WIDTH))
             
             #choose the appropriate model and get our action
             if 'NET' in hparams.model_type.upper():
-                combined_np = utils.processScreen(np.subtract(frame_np,lastFrame).ravel(),frame_mean,frame_std)          #combine the current frame with the last frame, and flatten
+                combined_np = utils.processScreen(np.subtract(frame_np,lastFrame),frame_mean,frame_std).ravel()          #combine the current frame with the last frame, and flatten
                 frame_t = torch.from_numpy(combined_np).float().to(DEVICE)     #convert to a tensor
                 p = model(frame_t)
             elif 'CNN' in hparams.model_type.upper():
                 frame_stack = np.stack([frame_np,lastFrame],0)
+                # processed = np.concatenate([utils.processScreen(frame_stack,frame_mean,frame_std),np.zeros((WIDTH,HEIGHT,1))],2)
+                # plt.imshow(processed)
                 frame_t = torch.from_numpy(utils.processScreen(frame_stack,frame_mean,frame_std)).float().to(DEVICE)
                 p = model(frame_t)
             else:
@@ -245,7 +245,7 @@ game = PLE(FLAPPYBIRD, display_screen=hparams.render, force_fps=True, rng=hparam
 if 'NET' in hparams.model_type.upper():
     model = models.PGNetwork(hparams,GRID_SIZE,OUTPUT,DEVICE).to(DEVICE)
 elif 'CNN' in hparams.model_type.upper():
-    model = models.CNN_PG(hparams, w=288, h=400, outputSize=OUTPUT,DEVICE=DEVICE).to(DEVICE)
+    model = models.CNN_PG(hparams, w=WIDTH, h=HEIGHT, outputSize=OUTPUT,DEVICE=DEVICE).to(DEVICE)
 else:
     raise Exception('Unsupported model type.')  
 
