@@ -18,6 +18,7 @@ class PGNetwork(torch.nn.Module):
     def __init__(self, hparams, inputSize, outputSize, DEVICE):
         super(PGNetwork,self).__init__()
         #class attributes
+        self.init_method = hparams.init_method.upper()
         self.leaky = hparams.leaky
         self.sigmoid = hparams.sigmoid
         self.hiddenSize = hparams.hidden
@@ -28,23 +29,34 @@ class PGNetwork(torch.nn.Module):
         self.temperature = torch.tensor(hparams.temperature if hparams.temperature > 0 else 1e-8, dtype=float)
         self.activations = {False:F.relu, True:F.leaky_relu}    #allows user to specify hidden activations
         self.layers = torch.nn.ModuleList()                     #this will store the layers of the network
-        
-        gain = torch.nn.init.calculate_gain('leaky_relu' if self.leaky else 'relu')
-        init_method = {'He':torch.nn.init.kaiming_uniform_, 'Xavier_normal':torch.nn.init.xavier_normal_,'Xavier_uniform':torch.nn.init.xavier_uniform_}
 
-        self.layers.append( torch.nn.Linear(inputSize, self.hiddenSize)) 
+        #build first layer
+        l1 = torch.nn.Linear(inputSize, self.hiddenSize) 
+        l1 = self.__initWeights(l1)
+        self.layers.append( l1 )
+        
+        #build dropout layer
         self.layers.append( self.dropout_layer(hparams.dropout,hparams.seed,DEVICE) )
 
         if hparams.num_hiddens <= 1:
-            self.layers.append( torch.nn.Linear(self.hiddenSize, outputSize) )
+            #build output layer
+            lyr =  torch.nn.Linear(self.hiddenSize, outputSize) 
+            lyr = self.__initWeights(lyr, sigmoid=True)
+            self.layers.append( lyr )
         else:
             for _ in range(2,hparams.num_hiddens+1):
-                self.layers.append( torch.nn.Linear(self.hiddenSize, self.hiddenSize) )
+                #build next linear layer
+                lyr =  torch.nn.Linear(self.hiddenSize, self.hiddenSize) 
+                lyr = self.__initWeights(lyr)
+                self.layers.append( lyr )
+                #add dropout layer
                 self.layers.append( self.dropout_layer(hparams.dropout,hparams.seed,DEVICE) )
-            self.layers.append( torch.nn.Linear(self.hiddenSize, outputSize) )
+            lyr = torch.nn.Linear(self.hiddenSize, outputSize) 
+            lyr = self.__initWeights(lyr, sigmoid=True)
+            self.layers.append( lyr )
 
         self.num_layers = len(self.layers)
-        print(self.num_layers,flush=True)  #should be twice the number of specified hidden layers due to dropout
+        print(self.num_layers,flush=True)  #should be twice the number of specified hidden layers + 1 due to dropout
 
     def forward(self,x):
         '''Takes a 1D input vector and outputs a probability.'''
@@ -64,6 +76,27 @@ class PGNetwork(torch.nn.Module):
         for i in range(m):
             inferences[i] = self.forward(x).detach()
         return torch.mean(inferences)
+    
+    def __initWeights(self, tensor, sigmoid=False):
+        gain = torch.nn.init.calculate_gain('leaky_relu' if self.leaky else 'relu')
+        gain = 1 if sigmoid else gain
+        if 'X' in self.init_method:
+            if 'NORM' in self.init_method:
+                torch.nn.init.xavier_normal(tensor.weight,gain)
+            else:
+                torch.nn.init.xavier_uniform(tensor.weight,gain)
+        else:
+            if 'NORM' in self.init_method:
+                if self.leaky:
+                    torch.nn.init.kaiming_normal_(tensor.weight,a=.01,nonlinearity='leaky_relu')
+                else:
+                    torch.nn.init.kaiming_normal_(tensor.weight,nonlinearity='relu')
+            else:
+                if self.leaky:
+                    torch.nn.init.kaiming_uniform_(tensor.weight,a=.01,nonlinearity='leaky_relu')
+                else:
+                    torch.nn.init.kaiming_uniform_(tensor.weight,nonlinearity='relu')
+        return tensor
         
 class CNN_PG(torch.nn.Module):
     '''Uses a deep CNN to implement a policy gradient network. Compares current state'''
@@ -160,6 +193,7 @@ class GaussianDropout(torch.nn.Module):
         
         Output:
         x- the tensor result of multiplicative Gaussian noise being applied to the input tensor'''
+
         noise = torch.normal(mean=1,std=self.alpha,generator=self.generator,size=x.size()).to(self.DEVICE)
         x = torch.mul(x,noise)
         return x
