@@ -143,3 +143,5 @@ data/PGNetwork-S1-Layers2-/bestFrames.p
 **/ple/games/doom/__pycache__/__init__.cpython-39.pyc
 **/ple/games/doom/__pycache__/doom.cpython-39.pyc
 **/ple/games/flappybird/__pycache__/__init__.cpython-39.pyc
+plot.py
+bestScore.py
