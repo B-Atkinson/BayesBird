@@ -45,15 +45,15 @@ def make_argparser():
     parser.add_argument('--gamma', type=float, default=.99)
     parser.add_argument('--hidden', type=int, default=200,
                         help="the number of hidden nodes to use in the network")
-    parser.add_argument('--init_method', type=str, default='Null',
-                        help='specify if weights should be initialized with torch default initialization, Xavier_uniform, Xavier_normal, or He initialization')
+    parser.add_argument('--init_method', type=str, default='He_normal',
+                        help='specify if weights should be initialized Xavier_uniform, Xavier_normal, He_uniform, or He_normal initialization')
     parser.add_argument('--leaky', type=str2bool, default=False,
                         help="if True, use Leaky ReLu activation, else use ReLU")
     parser.add_argument("--learning_rate", type=float, default=1e-4,
                         help="specify the base learning rate for the model")
     parser.add_argument('--L2', type=float, default=1e-2,
                         help='amount to decay weights for L2 penalty in Adam')
-    parser.add_argument('--num_hiddens', type=int, default=200,
+    parser.add_argument('--num_hiddens', type=int, default=4,
                         help="number of hidden linear layers to use in PG_Network")     
     parser.add_argument('--optim', type=str, default='Adam',
                         help='String specifying the type of optimizer to be used.')
@@ -71,7 +71,7 @@ def make_argparser():
                         help="choose if Gaussian or Bernoulli dropout is used")
     parser.add_argument('--maximize', type=str2bool, default=True,\
                         help="if True, Adam will maximize the objective function. Not implemented for RMSprop")
-    parser.add_argument('--model_type', type=str, default='CNN',
+    parser.add_argument('--model_type', type=str, default='PGNetwork',
                         help="can be PGNetwork or CNN")
     parser.add_argument('--num_episodes', type=int, default=200,
                         help="the number of episodes to train the agent on")
