@@ -1,36 +1,33 @@
 #!/bin/bash
 conda activate torch
-OUTPUT=/Users/student/Documents/brian/data/InitMethodTest/
-NUM_EPS=30000
+OUTPUT=/Users/student/Documents/brian/data/NodeVaryTest/LargeBatch/
+NUM_EPS=50000
 JOB=0
 SEED=1
 
-for INIT in Xavier_uniform Xavier_normal He_uniform He_normal
+for H in 50 100 150 200 
 do
-    for HIDDENS in 4
+    for NUM_H in 3 4 5
     do
-        for LEAKY in false true
-        do
-            screen -dm python /Users/student/Documents/brian/BayesBird/FBmain.py \
-            --model_type=PGNetwork \
-            --seed=$SEED \
-            --output_dir=$OUTPUT \
-            --num_episodes=$NUM_EPS \
-            --init_method=$INIT \
-            --num_hiddens=$HIDDENS \
-            --cells=2 \
-            --batch_size=200 \
-            --L2=.01 \
-            --learning_rate=.00001 \
-            --leaky=$LEAKY \
-            --sigmoid=true \
-            --temperature=1
+        screen -dm python /Users/student/Documents/brian/BayesBird/FBmain.py \
+        --model_type=PGNetwork \
+        --seed=$SEED \
+        --output_dir=$OUTPUT \
+        --num_episodes=$NUM_EPS \
+        --init_method=He_uniform \
+        --num_hiddens=$NUM_H \
+        --cells=2 \
+        --batch_size=500 \
+        --L2=.0001 \
+        --learning_rate=.00001 \
+        --leaky=false \
+        --sigmoid=true \
+        --hidden=$H
 
-            let JOB=JOB+1
-        done
+        let JOB=JOB+1
     done
 done
 
 echo "Jobs submitted: $JOB"
-sleep 3
+sleep 2
 screen -ls

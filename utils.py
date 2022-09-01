@@ -13,7 +13,7 @@ def build_directories(PATH):
         #create a unique name for the directory in case of overlapping paths
         print('directory already exists:',PATH)
         from time import time
-        PATH += "_"+str(time())[-4:]
+        PATH += "_"+str(time())[-5:]
 
     os.makedirs(os.path.join(PATH,'frames'),exist_ok=True)
     FRAMES = os.path.join(PATH,'frames')
