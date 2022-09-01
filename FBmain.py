@@ -44,7 +44,7 @@ GRID_SIZE = WIDTH * HEIGHT
 ACTION_MAP = {'flap': K_w,'noop': None}
 REWARDDICT = {"positive":1, "loss":-1}
 OUTPUT = 2 if hparams.softmax else 1
-PATH = hparams.output_dir + hparams.model_type +  f"-thesisNoNormDiscount-greedy-fullFrame"
+PATH = hparams.output_dir + hparams.model_type
 PATH, STATS, FRAMES = utils.build_directories(PATH)
 
 with open(os.path.join(PATH,'output.txt'),'w') as f:
