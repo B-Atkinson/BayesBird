@@ -49,9 +49,9 @@ def make_argparser():
                         help='specify if weights should be initialized Xavier_uniform, Xavier_normal, He_uniform, or He_normal initialization')
     parser.add_argument('--leaky', type=str2bool, default=False,
                         help="if True, use Leaky ReLu activation, else use ReLU")
-    parser.add_argument("--learning_rate", type=float, default=1e-4,
+    parser.add_argument("--learning_rate", type=float, default=1e-5,
                         help="specify the base learning rate for the model")
-    parser.add_argument('--L2', type=float, default=1e-2,
+    parser.add_argument('--L2', type=float, default=.0001,
                         help='amount to decay weights for L2 penalty in Adam')
     parser.add_argument('--num_hiddens', type=int, default=4,
                         help="number of hidden linear layers to use in PG_Network")     
