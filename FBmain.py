@@ -12,6 +12,7 @@ import params
 import utils
 import models
 from matplotlib import pyplot as plt
+import cv2
 
 
 
@@ -41,9 +42,9 @@ WIDTH = hparams.screenWidth     #if downsample by 4, w=72
 HEIGHT = hparams.screenHeight    #if downsample by 4, h=100
 GRID_SIZE = WIDTH * HEIGHT
 ACTION_MAP = {'flap': K_w,'noop': None}
-REWARDDICT = {"positive":2, "loss":-5}
+REWARDDICT = {"positive":1, "loss":-1}
 OUTPUT = 2 if hparams.softmax else 1
-PATH = hparams.output_dir + hparams.model_type +  f"-backwardDiscount-greedy"
+PATH = hparams.output_dir + hparams.model_type
 PATH, STATS, FRAMES = utils.build_directories(PATH)
 
 with open(os.path.join(PATH,'output.txt'),'w') as f:
@@ -62,7 +63,7 @@ if not hparams.render:
     os.environ['SDL_VIDEODRIVER'] = 'dummy'
 
 ###### Function definitions
-def train(hparams, model):
+def train(hparams, model,game):
     opt = torch.optim.Adam(params=model.parameters(),
                            lr=hparams.learning_rate,
                            maximize=hparams.maximize,
@@ -71,10 +72,10 @@ def train(hparams, model):
     opt.zero_grad()
     
     #Initialize FB environment   
-    FLAPPYBIRD = FlappyBird(rngSeed=hparams.seed)
-    game = PLE(FLAPPYBIRD, display_screen=hparams.render, force_fps=True, rng=hparams.seed, reward_values=REWARDDICT)
-    game.init()
-    
+    game.init()   
+
+    frame_mean, frame_std = utils.frameBurnIn(game,hparams,model,WIDTH,HEIGHT,DEVICE,gpu)
+
     training_summaries = []
     best_score, best_episode = -1,0
     
@@ -88,22 +89,26 @@ def train(hparams, model):
         
         agent_score, num_pipes = 0, 0
         frames, actions, rewards, probs = [], [], [], []
-        lastFrame = np.zeros([HEIGHT,WIDTH],dtype=float)
+
+        lastFrame = np.zeros([WIDTH,HEIGHT],dtype=float)
         
         #play a single game
         while not game.game_over():
             #retrieve current game state and process into tensor
-            currentFrame = game.getScreenRGB()
-            frame_np = utils.processScreen(currentFrame,WIDTH,HEIGHT)[0,:,:]
+            currentFrame = game.getScreenGrayscale()
+            frame_np = cv2.resize(currentFrame[:,:400], (HEIGHT,WIDTH))
             
             #choose the appropriate model and get our action
             if 'NET' in hparams.model_type.upper():
-                combined_np = np.subtract(frame_np,lastFrame).ravel()          #combine the current frame with the last frame, and flatten
+                combined_np = utils.processScreen(np.subtract(frame_np,lastFrame),frame_mean,frame_std).ravel()          #combine the current frame with the last frame, and flatten
                 frame_t = torch.from_numpy(combined_np).float().to(DEVICE)     #convert to a tensor
                 p = model(frame_t)
             elif 'CNN' in hparams.model_type.upper():
-                stack_t = torch.stack([torch.from_numpy(frame_np).float(),torch.from_numpy(lastFrame).float()],0).to(DEVICE)
-                p = model(stack_t)
+                frame_stack = np.stack([frame_np,lastFrame],0)
+                # processed = np.concatenate([utils.processScreen(frame_stack,frame_mean,frame_std),np.zeros((WIDTH,HEIGHT,1))],2)
+                # plt.imshow(processed)
+                frame_t = torch.from_numpy(utils.processScreen(frame_stack,frame_mean,frame_std)).float().to(DEVICE)
+                p = model(frame_t)
             else:
                 raise Exception('Unsupported model type.')         
 
@@ -112,12 +117,11 @@ def train(hparams, model):
 
             #get the action to take
             p_up = p[0].clone().to(DEVICE) if hparams.softmax else p.clone().to(DEVICE)
-            # if gpu=="MPS":
-            #     sample = torch.rand(1,dtype=torch.float32,generator=rng).to(DEVICE)
-            # else:
-            #     sample = torch.rand(1,dtype=float,generator=rng).to(DEVICE)
-            # action = ACTION_MAP['flap'] if sample <= p_up else ACTION_MAP['noop'] 
-            action = ACTION_MAP['flap'] if .5 <= p_up else ACTION_MAP['noop']   
+            if gpu=="MPS":
+                sample = torch.rand(1,dtype=torch.float32,generator=rng).to(DEVICE)
+            else:
+                sample = torch.rand(1,dtype=float,generator=rng).to(DEVICE)
+            action = ACTION_MAP['flap'] if sample <= p_up else ACTION_MAP['noop'] 
             
             #take the action
             reward = game.act(action)
@@ -140,8 +144,8 @@ def train(hparams, model):
             best_episode = episode
             with open(os.path.join(PATH,'output.txt'),'a') as f:
                 f.write(f'\n{string}new high score:{best_score} episode:{best_episode}\n')
+            torch.save(model.state_dict(), os.path.join(PATH,'best_model.pt'),pickle_protocol=4)
         training_summaries.append( (episode, num_pipes) )
-        
         stacked_rewards = np.vstack(rewards)
         discounted_reward = torch.tensor(utils.discount_rewards(stacked_rewards, hparams.gamma)).float().to(DEVICE) 
         
@@ -177,11 +181,10 @@ def train(hparams, model):
 
 
 
-def evaluate(hparams, model):
+def evaluate(hparams, model,game):
     #Initialize FB environment   
-    FLAPPYBIRD = FlappyBird(rngSeed=hparams.seed+1)
-    game = PLE(FLAPPYBIRD, display_screen=hparams.render, force_fps=True, rng=hparams.seed+1, reward_values=REWARDDICT)
     game.init()
+    frame_mean, frame_std = utils.frameBurnIn(game,hparams,model,WIDTH,HEIGHT,DEVICE,gpu)
 
     with open(os.path.join(PATH,'output.txt'),'a') as f:
         f.write(f'commencing evaluation\n')
@@ -191,26 +194,32 @@ def evaluate(hparams, model):
         
     num_pipes = 0
     frames = []
-    lastFrame = np.zeros([HEIGHT,WIDTH],dtype=float)
+    lastFrame = np.zeros([WIDTH,HEIGHT],dtype=float)
     f = 0    
     #play a single game
     while not game.game_over():
         f+=1
+        #retrieve current game state in RGB for movie-making
+        prettyFrame = game.getScreenRGB()
+        plt.imsave(os.path.join(FRAMES,f'evaluate_{f}.png'),prettyFrame)
+        
         #retrieve current game state and process into tensor
-        currentFrame = game.getScreenRGB()
-        frame_np = utils.processScreen(currentFrame,WIDTH,HEIGHT)[0,:,:]
-        plt.imsave(os.path.join(FRAMES,f'evaluate_{f}.png'),currentFrame)
+        currentFrame = game.getScreenGrayscale()
+        frame_np = cv2.resize(currentFrame[:,:400], (HEIGHT,WIDTH))
         
         #choose the appropriate model and get our action
         if 'NET' in hparams.model_type.upper():
-            combined_np = np.subtract(frame_np,lastFrame).ravel()          #combine the current frame with the last frame, and flatten
+            combined_np = utils.processScreen(np.subtract(frame_np,lastFrame),frame_mean,frame_std).ravel()          #combine the current frame with the last frame, and flatten
             frame_t = torch.from_numpy(combined_np).float().to(DEVICE)     #convert to a tensor
             p = model(frame_t)
         elif 'CNN' in hparams.model_type.upper():
-            stack_t = torch.stack([torch.from_numpy(frame_np).float(),torch.from_numpy(lastFrame).float()],0).to(DEVICE)
-            p = model(stack_t)
+            frame_stack = np.stack([frame_np,lastFrame],0)
+            # processed = np.concatenate([utils.processScreen(frame_stack,frame_mean,frame_std),np.zeros((WIDTH,HEIGHT,1))],2)
+            # plt.imshow(processed)
+            frame_t = torch.from_numpy(utils.processScreen(frame_stack,frame_mean,frame_std)).float().to(DEVICE)
+            p = model(frame_t)
         else:
-            raise Exception('Unsupported model type.')         
+            raise Exception('Unsupported model type.')      
 
         #update last frame array
         lastFrame = np.copy(frame_np)
@@ -231,6 +240,9 @@ def evaluate(hparams, model):
     
 
 #############   Main
+FLAPPYBIRD = FlappyBird(rngSeed=hparams.seed)
+game = PLE(FLAPPYBIRD, display_screen=hparams.render, force_fps=True, rng=hparams.seed, reward_values=REWARDDICT)
+
 
 #train a model
 if 'NET' in hparams.model_type.upper():
@@ -241,21 +253,21 @@ else:
     raise Exception('Unsupported model type.')  
 
 #evaulate the model resulting from full training length
-lastModel, (best_score, best_episode) = train(hparams,model)
+lastModel, (best_score, best_episode) = train(hparams,model,game)
 with open(os.path.join(PATH,'output.txt'),'a') as f:
     f.write(f'\ntraining completed\nbest score: {best_score} achieved at episode {best_episode}\n\nbeginning evaluation\n')
 print(f'\ntraining completed\nbest score: {best_score} achieved at episode {best_episode}\n\nbeginning evaluation\n',flush=True)
-num_pipes = evaluate(hparams,lastModel)
-with open(os.path.join(PATH,'output.txt'),'a') as f:
-        f.write(f'\nlast model evaluation completed\nscore: {num_pipes}\n')
 
 #attempt to evaluate the best overall model from training
 try:
-    bestModel = torch.load(PATH+'/bestModel.pt',map_location=DEVICE)
-    num_pipes = evaluate(hparams,bestModel)
+    model.load_state_dict(torch.load(os.path.join(PATH,'best_model.pt')))
+    game = FLAPPYBIRD = FlappyBird(rngSeed=hparams.seed+10)
+    game = PLE(FLAPPYBIRD, display_screen=hparams.render, force_fps=True, rng=hparams.seed+10, reward_values=REWARDDICT)
+    num_pipes = evaluate(hparams,model,game)
     with open(os.path.join(PATH,'output.txt'),'a') as f:
-        f.write(f'\ntrue best evaluation completed\nscore: {num_pipes}\n')
-except:
-    with open(PATH+'/digest.txt','w') as f:
+        f.write(f'\nevaluation completed\nscore: {num_pipes}\n')
+except Exception as e:
+    print(e)
+    with open(PATH+'/output.txt','w') as f:
         f.write(f'Unable to load best model\n')
 
