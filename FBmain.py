@@ -35,12 +35,12 @@ else:
         gpu=False
 
 lastAct = "Sig" if hparams.sigmoid else "Linear"
-lastAct = "Softmax" if hparams.softmax else lastAct
 
 #specified in ple/__init__.py lines 187-194
 WIDTH = hparams.screenWidth     #if downsample by 4, w=72
 HEIGHT = hparams.screenHeight    #if downsample by 4, h=100
 GRID_SIZE = WIDTH * HEIGHT
+GAP = 150
 ACTION_MAP = {'flap': K_w,'noop': None}
 REWARDDICT = {"positive":1, "loss":-1}
 OUTPUT = 2 if hparams.softmax else 1
@@ -74,7 +74,7 @@ def train(hparams, model,game):
     #Initialize FB environment   
     game.init()   
 
-    frame_mean, frame_std = utils.frameBurnIn(game,hparams,model,WIDTH,HEIGHT,DEVICE,gpu)
+    # frame_mean, frame_std = utils.frameBurnIn(game,hparams,model,WIDTH,HEIGHT,DEVICE,gpu)
 
     training_summaries = []
     best_score, best_episode = -1,0
@@ -88,7 +88,7 @@ def train(hparams, model,game):
         game.reset_game()
         
         agent_score, num_pipes = 0, 0
-        frames, actions, rewards, probs = [], [], [], []
+        frames, actions, rewards, probs, log_ps = [], [], [], [], []
 
         lastFrame = np.zeros([WIDTH,HEIGHT],dtype=float)
         
@@ -96,35 +96,36 @@ def train(hparams, model,game):
         while not game.game_over():
             #retrieve current game state and process into tensor
             currentFrame = game.getScreenGrayscale()
-            frame_np = cv2.resize(currentFrame[:,:400], (HEIGHT,WIDTH))
+            frame_np = currentFrame[:,:400]
+            frame_np = frame_np[::4,::4]
+            norm_np = (frame_np-frame_np.mean())/(frame_np.std()+np.finfo(float).eps)
             
             #choose the appropriate model and get our action
             if 'NET' in hparams.model_type.upper():
-                combined_np = utils.processScreen(np.subtract(frame_np,lastFrame),frame_mean,frame_std).ravel()          #combine the current frame with the last frame, and flatten
+                combined_np = norm_np.ravel()
+                # plt.imshow(combined_np.reshape(WIDTH,HEIGHT))
                 frame_t = torch.from_numpy(combined_np).float().to(DEVICE)     #convert to a tensor
                 p = model(frame_t)
             elif 'CNN' in hparams.model_type.upper():
-                frame_stack = np.stack([frame_np,lastFrame],0)
+                # frame_stack = np.stack([norm_np,lastFrame],0)
                 # processed = np.concatenate([utils.processScreen(frame_stack,frame_mean,frame_std),np.zeros((WIDTH,HEIGHT,1))],2)
                 # plt.imshow(processed)
-                frame_t = torch.from_numpy(utils.processScreen(frame_stack,frame_mean,frame_std)).float().to(DEVICE)
+                frame_t = torch.from_numpy(norm_np.reshape([1,WIDTH,HEIGHT])).float().to(DEVICE)
                 p = model(frame_t)
             else:
                 raise Exception('Unsupported model type.')         
 
             #update last frame array
-            lastFrame = np.copy(frame_np)
+            lastFrame = np.copy(norm_np)
 
             #get the action to take
-            p_up = p[0].clone().to(DEVICE) if hparams.softmax else p.clone().to(DEVICE)
-            if gpu=="MPS":
-                sample = torch.rand(1,dtype=torch.float32,generator=rng).to(DEVICE)
-            else:
-                sample = torch.rand(1,dtype=float,generator=rng).to(DEVICE)
-            action = ACTION_MAP['flap'] if sample <= p_up else ACTION_MAP['noop'] 
+            dist = torch.distributions.bernoulli.Bernoulli(p)
+            action = dist.sample()
+            logp = dist.log_prob(action)
+            log_ps.append(logp) 
             
             #take the action
-            reward = game.act(action)
+            reward = game.act(ACTION_MAP['flap'] if action==1 else ACTION_MAP['noop'])
             agent_score += reward
             
             #record data for this step
@@ -133,8 +134,7 @@ def train(hparams, model,game):
             frames.append(currentFrame)
             actions.append(1 if action==K_w else 0) #flaps stored as 1, no-flap stored as 0
             rewards.append(reward)
-            probs.append(p_up)
-
+            probs.append(p)
         #end of game play for episode
             
         #update performance variables
@@ -147,12 +147,14 @@ def train(hparams, model,game):
             torch.save(model.state_dict(), os.path.join(PATH,'best_model.pt'),pickle_protocol=4)
         training_summaries.append( (episode, num_pipes) )
         stacked_rewards = np.vstack(rewards)
-        discounted_reward = torch.tensor(utils.discount_rewards(stacked_rewards, hparams.gamma)).float().to(DEVICE) 
+        discounted_reward, num_sets = utils.discount_rewards(stacked_rewards, hparams.gamma)
+        discounted_reward = torch.tensor(discounted_reward).float().to(DEVICE)
+        num_sets =  torch.tensor(num_sets).float().to(DEVICE)
         
         #calculate loss and do backprop
-        prob_t = torch.stack(probs)         #create tensor of network outputs while preserving computational graph
-        logp = torch.log(prob_t)            #add all log probabilities in the episode
-        loss = torch.div(torch.mul(discounted_reward,logp), hparams.batch_size) #divide by number of samples (i.e. episodes in batch)
+        logp = torch.stack(log_ps)            #add all log probabilities in the episode
+        loss = torch.mul(discounted_reward,logp)
+        loss = torch.div(loss, hparams.batch_size) #divide by number of samples (i.e. episodes in batch)
         
         try:
             loss.backward()
@@ -184,7 +186,6 @@ def train(hparams, model,game):
 def evaluate(hparams, model,game):
     #Initialize FB environment   
     game.init()
-    frame_mean, frame_std = utils.frameBurnIn(game,hparams,model,WIDTH,HEIGHT,DEVICE,gpu)
 
     with open(os.path.join(PATH,'output.txt'),'a') as f:
         f.write(f'commencing evaluation\n')
@@ -205,18 +206,20 @@ def evaluate(hparams, model,game):
         
         #retrieve current game state and process into tensor
         currentFrame = game.getScreenGrayscale()
-        frame_np = cv2.resize(currentFrame[:,:400], (HEIGHT,WIDTH))
+        frame_np = currentFrame[:,:400]
+        frame_np = frame_np[::4,::4]
+        norm_np = (frame_np-frame_np.mean())/(frame_np.std()+np.finfo(float).eps)
         
         #choose the appropriate model and get our action
         if 'NET' in hparams.model_type.upper():
-            combined_np = utils.processScreen(np.subtract(frame_np,lastFrame),frame_mean,frame_std).ravel()          #combine the current frame with the last frame, and flatten
+            combined_np = norm_np.ravel()          #combine the current frame with the last frame, and flatten
             frame_t = torch.from_numpy(combined_np).float().to(DEVICE)     #convert to a tensor
             p = model(frame_t)
         elif 'CNN' in hparams.model_type.upper():
-            frame_stack = np.stack([frame_np,lastFrame],0)
+            frame_stack = np.stack([norm_np,lastFrame],0)
             # processed = np.concatenate([utils.processScreen(frame_stack,frame_mean,frame_std),np.zeros((WIDTH,HEIGHT,1))],2)
             # plt.imshow(processed)
-            frame_t = torch.from_numpy(utils.processScreen(frame_stack,frame_mean,frame_std)).float().to(DEVICE)
+            frame_t = torch.from_numpy(frame_stack).float().to(DEVICE)
             p = model(frame_t)
         else:
             raise Exception('Unsupported model type.')      
@@ -240,7 +243,7 @@ def evaluate(hparams, model,game):
     
 
 #############   Main
-FLAPPYBIRD = FlappyBird(rngSeed=hparams.seed)
+FLAPPYBIRD = FlappyBird(pipe_gap=GAP, rngSeed=hparams.seed)
 game = PLE(FLAPPYBIRD, display_screen=hparams.render, force_fps=True, rng=hparams.seed, reward_values=REWARDDICT)
 
 
@@ -261,7 +264,7 @@ print(f'\ntraining completed\nbest score: {best_score} achieved at episode {best
 #attempt to evaluate the best overall model from training
 try:
     model.load_state_dict(torch.load(os.path.join(PATH,'best_model.pt')))
-    game = FLAPPYBIRD = FlappyBird(rngSeed=hparams.seed+10)
+    game = FLAPPYBIRD = FlappyBird(pipe_gap=GAP, rngSeed=hparams.seed+10)
     game = PLE(FLAPPYBIRD, display_screen=hparams.render, force_fps=True, rng=hparams.seed+10, reward_values=REWARDDICT)
     num_pipes = evaluate(hparams,model,game)
     with open(os.path.join(PATH,'output.txt'),'a') as f:
