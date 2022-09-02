@@ -123,7 +123,7 @@ class CNN_PG(torch.nn.Module):
                                                     self.activations[self.leaky])
                                                     )
             else:
-                self.layers.append( torch.nn.Sequential(torch.nn.Conv2d(in_channels=2,out_channels=64, kernel_size=5,padding=2),
+                self.layers.append( torch.nn.Sequential(torch.nn.Conv2d(in_channels=1,out_channels=64, kernel_size=5,padding=2),
                                                     self.activations[self.leaky])
                                                     )
                 firstLayer = False
