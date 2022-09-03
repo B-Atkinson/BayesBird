@@ -101,7 +101,7 @@ def train(hparams, model,game):
             norm_np = (frame_np-frame_np.mean())/(frame_np.std()+np.finfo(float).eps)
             
             #choose the appropriate model and get our action
-            if 'NET' in hparams.model_type.upper():
+            if 'PGN' in hparams.model_type.upper():
                 combined_np = norm_np.ravel()
                 # plt.imshow(combined_np.reshape(WIDTH,HEIGHT))
                 frame_t = torch.from_numpy(combined_np).float().to(DEVICE)     #convert to a tensor
@@ -115,14 +115,16 @@ def train(hparams, model,game):
             else:
                 raise Exception('Unsupported model type.')         
 
-            #update last frame array
-            lastFrame = np.copy(norm_np)
-
             #get the action to take
-            dist = torch.distributions.bernoulli.Bernoulli(p)
-            action = dist.sample()
-            logp = dist.log_prob(action)
-            log_ps.append(logp) 
+            if hparams.dropout == 0.:
+                dist = torch.distributions.bernoulli.Bernoulli(p)
+                action = dist.sample()
+                logp = dist.log_prob(action)
+                log_ps.append(logp)
+            else:
+                action = 1 if p >= .5 else 0
+                logp = torch.log( p if action==1 else 1-p  )
+                log_ps.append(logp)
             
             #take the action
             reward = game.act(ACTION_MAP['flap'] if action==1 else ACTION_MAP['noop'])
@@ -147,7 +149,7 @@ def train(hparams, model,game):
             torch.save(model.state_dict(), os.path.join(PATH,'best_model.pt'),pickle_protocol=4)
         training_summaries.append( (episode, num_pipes) )
         stacked_rewards = np.vstack(rewards)
-        discounted_reward, num_sets = utils.discount_rewards(stacked_rewards, hparams.gamma)
+        discounted_reward, num_sets = utils.discount_rewards(stacked_rewards, hparams.gamma, hparams.discount_vector)
         discounted_reward = torch.tensor(discounted_reward).float().to(DEVICE)
         num_sets =  torch.tensor(num_sets).float().to(DEVICE)
         
@@ -155,6 +157,7 @@ def train(hparams, model,game):
         logp = torch.stack(log_ps)            #add all log probabilities in the episode
         loss = torch.mul(discounted_reward,logp)
         loss = torch.div(loss, hparams.batch_size) #divide by number of samples (i.e. episodes in batch)
+        
         
         try:
             loss.backward()
@@ -193,7 +196,7 @@ def evaluate(hparams, model,game):
 
     game.reset_game()
         
-    num_pipes = 0
+    agent_score,num_pipes = 0,0
     frames = []
     lastFrame = np.zeros([WIDTH,HEIGHT],dtype=float)
     f = 0    
@@ -211,28 +214,26 @@ def evaluate(hparams, model,game):
         norm_np = (frame_np-frame_np.mean())/(frame_np.std()+np.finfo(float).eps)
         
         #choose the appropriate model and get our action
-        if 'NET' in hparams.model_type.upper():
-            combined_np = norm_np.ravel()          #combine the current frame with the last frame, and flatten
+        if 'PGN' in hparams.model_type.upper():
+            combined_np = norm_np.ravel()
+            # plt.imshow(combined_np.reshape(WIDTH,HEIGHT))
             frame_t = torch.from_numpy(combined_np).float().to(DEVICE)     #convert to a tensor
-            p = model(frame_t)
+            p = model.evaluate(frame_t) if hparams.dropout != 0. else model(frame_t)
         elif 'CNN' in hparams.model_type.upper():
-            frame_stack = np.stack([norm_np,lastFrame],0)
+            # frame_stack = np.stack([norm_np,lastFrame],0)
             # processed = np.concatenate([utils.processScreen(frame_stack,frame_mean,frame_std),np.zeros((WIDTH,HEIGHT,1))],2)
             # plt.imshow(processed)
-            frame_t = torch.from_numpy(frame_stack).float().to(DEVICE)
-            p = model(frame_t)
+            frame_t = torch.from_numpy(norm_np.reshape([1,WIDTH,HEIGHT])).float().to(DEVICE)
+            p = model.evaluate(frame_t) if hparams.dropout != 0. else model(frame_t)
         else:
-            raise Exception('Unsupported model type.')      
-
-        #update last frame array
-        lastFrame = np.copy(frame_np)
+            raise Exception('Unsupported model type.')     
 
         #get the action to take
-        p_up = p[0].clone().to(DEVICE) if hparams.softmax else p.clone().to(DEVICE)
-        action = ACTION_MAP['flap'] if .5 <= p_up else ACTION_MAP['noop']   
-            
+        action = 1 if p >= .5 else 0
+        
         #take the action
-        reward = game.act(action)
+        reward = game.act(ACTION_MAP['flap'] if action==1 else ACTION_MAP['noop'])
+        agent_score += reward
             
         #record data for this step
         if reward > 0:
@@ -248,7 +249,7 @@ game = PLE(FLAPPYBIRD, display_screen=hparams.render, force_fps=True, rng=hparam
 
 
 #train a model
-if 'NET' in hparams.model_type.upper():
+if 'PGN' in hparams.model_type.upper():
     model = models.PGNetwork(hparams,GRID_SIZE,OUTPUT,DEVICE).to(DEVICE)
 elif 'CNN' in hparams.model_type.upper():
     model = models.CNN_PG(hparams, w=WIDTH, h=HEIGHT, outputSize=OUTPUT,DEVICE=DEVICE).to(DEVICE)
