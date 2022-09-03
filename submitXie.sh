@@ -1,32 +1,36 @@
 #!/bin/bash
 conda activate torch
-OUTPUT=/Users/student/Documents/brian/data/NodeVaryTest/LargeBatch/
-NUM_EPS=50000
+OUTPUT=/Users/student/Documents/brian/data/dropoutTest/
 JOB=0
-SEED=1
 
-for H in 50 100 150 200 
+
+for SEED in 2 3
 do
-    for NUM_H in 3 4 5
+    for P_DROP in .25 .5 .75
     do
-        screen -dm python /Users/student/Documents/brian/BayesBird/FBmain.py \
-        --model_type=PGNetwork \
-        --seed=$SEED \
-        --output_dir=$OUTPUT \
-        --num_episodes=$NUM_EPS \
-        --init_method=He_uniform \
-        --num_hiddens=$NUM_H \
-        --cells=2 \
-        --batch_size=500 \
-        --L2=.0001 \
-        --learning_rate=.00001 \
-        --leaky=false \
-        --sigmoid=true \
-        --hidden=$H
+        for DROP_TYPE in GAUSS BERN
+        do
+            screen -dm python /Users/student/Documents/brian/BayesBird/FBmain.py \
+            --model_type=PGNetwork \
+            --seed=$SEED \
+            --output_dir=$OUTPUT \
+            --num_episodes=100000 \
+            --batch_size=50 \
+            --init_method=He_uniform \
+            --num_hiddens=3 \
+            --dropout=$P_DROP \
+            --dropout_type=$DROP_TYPE \
+            --L2=0. \
+            --learning_rate=.0001 \
+            --leaky=false \
+            --sigmoid=true \
+            --hidden=300
 
-        let JOB=JOB+1
+            let JOB=JOB+1
+        done
     done
 done
+
 
 echo "Jobs submitted: $JOB"
 sleep 2
