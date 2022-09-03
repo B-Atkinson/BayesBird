@@ -21,7 +21,7 @@ def build_directories(PATH):
     print('Saving to: ' + PATH,flush=True)
     return PATH, STATS, FRAMES
 
-def discount_rewards(r, gamma):
+def discount_rewards(r, gamma, disc_vector):
     '''This function analyzes the reward received after each action in an episode. It takes in a numpy array of rewards
     and applies the discount factor, resetting the decay counter each time a non-zero reward is received. In  doing  so 
     the network will view the sequence of actions between pipes as independent, which means that an agent  who  crossed
@@ -36,5 +36,9 @@ def discount_rewards(r, gamma):
         running_sum = running_sum * gamma + r[t]
         disc_r[t] = running_sum
 
-    # Note that we add eps in the rare case that the std is 0
-    return sum(disc_r), num_sets
+    if disc_vector:
+        #return a discounted reward array and the number of pipes
+        return disc_r, num_sets
+    else:
+        #return a single scalar discounted reward and the number of pipes
+        return sum(disc_r), num_sets
