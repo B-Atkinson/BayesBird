@@ -23,7 +23,6 @@
 import argparse
 import os
 import yaml
-import time
 
 
 def make_argparser():
@@ -36,15 +35,15 @@ def make_argparser():
     
     
     #hyperparameters
-    parser.add_argument('--batch_size', type=int, default=25,
+    parser.add_argument('--batch_size', type=int, default=10,
                         help="number of episodes to conduct rmsprop parameter updates over")
     parser.add_argument('--cells', type=int, default=2,
                         help="number of Conv2d-BatchNorm-ReLu cells to use in CNN_PG")
-    parser.add_argument('--dropout', type=float, default=0,
+    parser.add_argument('--dropout', type=float, default=0.5,
                         help="likelihood of a neuron to be dropped, as a decimal from [0,1)")
     parser.add_argument('--gamma', type=float, default=.99)
     parser.add_argument('--hidden', type=int, default=300,
-                        help="the number of hidden nodes to use in the network")
+                        help="the number of hidden nodes to use in each hidden layer of the network")
     parser.add_argument('--init_method', type=str, default='He_normal',
                         help='specify if weights should be initialized Xavier_uniform, Xavier_normal, He_uniform, or He_normal initialization')
     parser.add_argument('--leaky', type=str2bool, default=False,
@@ -54,7 +53,7 @@ def make_argparser():
     parser.add_argument('--L2', type=float, default=0.,
                         help='amount to decay weights for L2 penalty in Adam')
     parser.add_argument('--num_hiddens', type=int, default=3,
-                        help="number of hidden linear layers to use in PG_Network")     
+                        help="number of hidden fully connected layers to use in PG_Network")     
     parser.add_argument('--optim', type=str, default='Adam',
                         help='String specifying the type of optimizer to be used.')
     parser.add_argument('--sigmoid', type=str2bool, default=True,
@@ -67,13 +66,15 @@ def make_argparser():
     
     
     #training arguments
-    parser.add_argument('--dropout_type', type=str, default='Bern',
+    parser.add_argument('--discount_vector', type=str2bool, default=True,
+                        help="if True, the agent is passed an array of discounted rewards; and a single scalar discounted reward if False")
+    parser.add_argument('--dropout_type', type=str, default='Gauss',
                         help="choose if Gaussian or Bernoulli dropout is used")
     parser.add_argument('--maximize', type=str2bool, default=True,\
                         help="if True, Adam will maximize the objective function. Not implemented for RMSprop")
-    parser.add_argument('--model_type', type=str, default='CNN',
+    parser.add_argument('--model_type', type=str, default='PGNetwork',
                         help="can be PGNetwork or CNN")
-    parser.add_argument('--num_episodes', type=int, default=2000,
+    parser.add_argument('--num_episodes', type=int, default=20,
                         help="the number of episodes to train the agent on")
     parser.add_argument('--save_stats', type=int, default=200,
                         help="specifies the number of episodes to wait until saving network parameters, training summaries, and moves")
