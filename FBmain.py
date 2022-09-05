@@ -12,7 +12,6 @@ import params
 import utils
 import models
 from matplotlib import pyplot as plt
-import cv2
 
 
 
@@ -33,8 +32,6 @@ else:
         gpu='CUDA'
     else:
         gpu=False
-
-lastAct = "Sig" if hparams.sigmoid else "Linear"
 
 #specified in ple/__init__.py lines 187-194
 WIDTH = hparams.screenWidth     #if downsample by 4, w=72
