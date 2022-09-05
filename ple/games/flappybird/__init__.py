@@ -121,10 +121,6 @@ class Pipe(pygame.sprite.Sprite):
         self.image.fill((0, 0, 0))
         self.gap_start = gap_start
         self.x = self.SCREEN_WIDTH + self.width + offset
-        
-        with open('output_1.txt','a') as file:
-            string = 'pipe x: '+str(self.x)+'\n'
-            file.write(string)
 
         self.lower_pipe = self.image_assets[color]["lower"]
         self.upper_pipe = self.image_assets[color]["upper"]
@@ -379,11 +375,7 @@ class FlappyBird(base.PyGameWrapper):
                 self.scale,
                 color=self.pipe_color,
                 offset=offset
-            )
-            
-            with open('output_1.txt','a') as file:
-                string = 'pipe start: {0} gap: {1}\n'.format(start_gap,self.pipe_gap)
-                file.write(string)   
+            )  
                 
             return pipe
         else:

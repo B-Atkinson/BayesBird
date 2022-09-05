@@ -1,18 +1,56 @@
-for L2 in 1e-2 1e-3 1e-4
+#!/bin/bash
+OUTPUT=/home/brian.atkinson/Bayes/data/CNN_Temp_Test/
+echo -e "saving experiment to:\n$OUTPUT\n"
+NUM_EPS=50000
+SEED=1
+MODEL=CNN_PG
+TEMP=1
+
+JOB=1
+for LR in .0001 .00001
 do
-    for TEMP in 1e-5 1e-6 1e-7
+    for LEAKY in false true
     do
-        for LR in 1e-1 1e-2 1e-3
+        for TEMP in 100000 1000000
         do
-            python FBmain.py \
-            --hidden=200 \
-            --learning_rate=$LR \
-            --num_episodes=10000 \
-            --gamma=.99 \
-            --leaky=false \
-            --sigmoid=true \
-            --temperatuer=$TEMP \
-            --model_type=PGNetwork
+            sbatch --job-name=$JOB \
+            --export=ALL,OUTPUT=$OUTPUT,NUM_EPS=$NUM_EPS,SEED=$SEED,LR=$LR,TEMP=$TEMP,LEAKY=$LEAKY,MODEL=$MODEL \
+            --output=/home/brian.atkinson/Bayes/text_files/CNNTempTest_$SEED.TEMP$TEMP.txt \
+            submit.sh
+            let JOB=JOB+1
         done
     done
 done
+<<comment
+for L2 in .0001
+do
+    for LR in .01
+    do
+        for LEAKY in true
+        do
+            for SIG in true
+            do
+                if [ $SIG = true ] ; then
+                    for TEMP in 1e-5
+                    do
+                        sbatch --job-name=$JOB \
+                        --export=ALL,OUTPUT=$OUTPUT,NUM=$NUM_EPS,L2=$L2,LR=$LR,LEAKY=$LEAKY,SIG=$SIG,TEMP=$TEMP \
+                        --output=/home/brian.atkinson/Bayes/text_files/L2$L2.LR$LR.LEAKY$LEAKY.TEMP$TEMP.txt \
+                        submit.sh
+                        let JOB=JOB+1
+                    done
+                else
+                    sbatch --job-name=$JOB \
+                        --export=ALL,OUTPUT=$OUTPUT,NUM=$NUM_EPS,L2=$L2,LR=$LR,LEAKY=$LEAKY,SIG=$SIG,TEMP=1 \
+                        --output=/home/brian.atkinson/Bayes/text_files/L2$L2.LR$LR.LEAKY$LEAKY.SIG$SIG.txt \
+                        submit.sh
+                        let JOB=JOB+1
+
+                fi
+            done
+        done
+    done
+done
+comment
+
+

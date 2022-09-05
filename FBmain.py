@@ -1,5 +1,4 @@
 import torch
-import torch.nn.functional as F
 import os
 import pickle
 import json
@@ -12,27 +11,47 @@ from pygame.constants import K_w
 import params
 import utils
 import models
-from tqdm import tqdm
+from matplotlib import pyplot as plt
+import cv2
 
 
 
 hparams = params.get_hparams()
+#check if a CUDA GPU is available
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 LOADER_KWARGS = {'num_workers': hparams.workers, 'pin_memory': True} if torch.cuda.is_available() else {}
-print(f'use gpu:{torch.cuda.is_available()}')
+
+#if no CUDA GPU available, check for Apple M1-specific GPU called MPS
+if not torch.cuda.is_available():
+    DEVICE = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    if torch.backends.mps.is_available():
+        gpu='MPS'
+    else:
+        gpu=False
+else:
+    if torch.cuda.is_available():
+        gpu='CUDA'
+    else:
+        gpu=False
+
+lastAct = "Sig" if hparams.sigmoid else "Linear"
 
 #specified in ple/__init__.py lines 187-194
-WIDTH = 100     #downsample by half twice
-HEIGHT = 72    #downsample by half twice
+WIDTH = hparams.screenWidth     #if downsample by 4, w=72
+HEIGHT = hparams.screenHeight    #if downsample by 4, h=100
 GRID_SIZE = WIDTH * HEIGHT
+GAP = 150
 ACTION_MAP = {'flap': K_w,'noop': None}
-REWARDDICT = {"positive":2, "loss":-5}
-OUTPUT = 1
-PATH = hparams.output_dir + "-"+ hparams.model_type +  "-S" + str(hparams.seed)
-PATH, STATS = utils.build_directories(hparams,PATH)
+REWARDDICT = {"positive":1, "loss":-1}
+OUTPUT = 2 if hparams.softmax else 1
+PATH = hparams.output_dir + hparams.model_type
+PATH, STATS, FRAMES = utils.build_directories(PATH)
 
-rng = np.random.default_rng(hparams.seed)
-rng = torch.Generator(device=DEVICE)
+with open(os.path.join(PATH,'output.txt'),'w') as f:
+    f.write(f'gpu:{gpu}\n')
+print(f'gpu:{gpu}')
+
+rng = torch.Generator()
 rng.manual_seed(hparams.seed)
 
 #save metadata for easy viewing 
@@ -44,58 +63,77 @@ if not hparams.render:
     os.environ['SDL_VIDEODRIVER'] = 'dummy'
 
 ###### Function definitions
-def train(hparams, model):
+def train(hparams, model,game):
     opt = torch.optim.Adam(params=model.parameters(),
                            lr=hparams.learning_rate,
                            maximize=hparams.maximize,
                            weight_decay=hparams.L2
                            )
+    opt.zero_grad()
     
     #Initialize FB environment   
-    FLAPPYBIRD = FlappyBird(rngSeed=hparams.seed)
-    game = PLE(FLAPPYBIRD, display_screen=hparams.render, force_fps=True, rng=hparams.seed, reward_values=REWARDDICT)
-    game.init()
-    
+    game.init()   
+
+    # frame_mean, frame_std = utils.frameBurnIn(game,hparams,model,WIDTH,HEIGHT,DEVICE,gpu)
+
     training_summaries = []
     best_score, best_episode = -1,0
     
-    print(f'commencing training with {hparams.model_type} model')
+    with open(os.path.join(PATH,'output.txt'),'a') as f:
+        f.write(f'commencing training with {hparams.model_type} model\n')
+    print(f'commencing training with {hparams.model_type} model',flush=True)
     
     #train for num_episodes
-    for episode in tqdm(range(1,1+hparams.num_episodes)):
+    for episode in range(1,1+hparams.num_episodes):
         game.reset_game()
         
         agent_score, num_pipes = 0, 0
-        frames, actions, rewards, probs = [], [], [], []
-        lastFrame = np.zeros([GRID_SIZE])
+        frames, actions, rewards, probs, log_ps = [], [], [], [], []
+
+        lastFrame = np.zeros([WIDTH,HEIGHT],dtype=float)
         
         #play a single game
         while not game.game_over():
             #retrieve current game state and process into tensor
-            currentFrame = game.getScreenRGB()
-            frame_np = utils.processScreen(currentFrame)
-            combined_np = np.subtract(frame_np,lastFrame)    #combine the current frame with the last frame, and flatten
-            frame_t = torch.from_numpy(combined_np).float().to(DEVICE)     #convert to a tensor
-            lastFrame = np.copy(frame_np)
+            currentFrame = game.getScreenGrayscale()
+            frame_np = currentFrame[:,:400]
+            frame_np = frame_np[::4,::4]
+            norm_np = (frame_np-frame_np.mean())/(frame_np.std()+np.finfo(float).eps)
             
             #choose the appropriate model and get our action
-            if hparams.model_type == 'PGNetwork':
+            if 'PGN' in hparams.model_type.upper():
+                combined_np = norm_np.ravel()
+                # plt.imshow(combined_np.reshape(WIDTH,HEIGHT))
+                frame_t = torch.from_numpy(combined_np).float().to(DEVICE)     #convert to a tensor
                 p = model(frame_t)
-                action = ACTION_MAP['flap'] if torch.rand(1,dtype=float,generator=rng) < p else ACTION_MAP['noop']
-            elif hparams.model_type == 'NoisyPG':
+            elif 'CNN' in hparams.model_type.upper():
+                # frame_stack = np.stack([norm_np,lastFrame],0)
+                # processed = np.concatenate([utils.processScreen(frame_stack,frame_mean,frame_std),np.zeros((WIDTH,HEIGHT,1))],2)
+                # plt.imshow(processed)
+                frame_t = torch.from_numpy(norm_np.reshape([1,WIDTH,HEIGHT])).float().to(DEVICE)
                 p = model(frame_t)
-                action = ACTION_MAP['flap'] if torch.rand(1,dtype=float,generator=rng) < p else ACTION_MAP['noop']
             else:
-                raise Exception('Unsupported model type.')            
+                raise Exception('Unsupported model type.')         
+
+            #get the action to take
+            if hparams.dropout == 0.:
+                dist = torch.distributions.bernoulli.Bernoulli(p)
+                action = dist.sample()
+                logp = dist.log_prob(action)
+                log_ps.append(logp)
+            else:
+                action = 1 if p >= .5 else 0
+                logp = torch.log( p if action==1 else 1-p  )
+                log_ps.append(logp)
             
             #take the action
-            reward = game.act(action)
+            reward = game.act(ACTION_MAP['flap'] if action==1 else ACTION_MAP['noop'])
             agent_score += reward
             
             #record data for this step
             if reward > 0:
                 num_pipes += 1
-            frames.append(frame_t)
+            frames.append(currentFrame)
             actions.append(1 if action==K_w else 0) #flaps stored as 1, no-flap stored as 0
             rewards.append(reward)
             probs.append(p)
@@ -103,26 +141,29 @@ def train(hparams, model):
             
         #update performance variables
         if num_pipes > best_score:
-            pickle.dump(frames,open(PATH+'/bestFrames.p','wb'))
-            # pickle.dump(model, open(MODEL_NAME  + str(episode) + '.p', 'wb'))
+            string = ''
             best_score = num_pipes
             best_episode = episode
+            with open(os.path.join(PATH,'output.txt'),'a') as f:
+                f.write(f'\n{string}new high score:{best_score} episode:{best_episode}\n')
+            torch.save(model.state_dict(), os.path.join(PATH,'best_model.pt'),pickle_protocol=4)
         training_summaries.append( (episode, num_pipes) )
-        
         stacked_rewards = np.vstack(rewards)
-        discounted_reward = torch.tensor(utils.discount_rewards(stacked_rewards, hparams.gamma)).float().to(DEVICE) 
+        discounted_reward, num_sets = utils.discount_rewards(stacked_rewards, hparams.gamma, hparams.discount_vector)
+        discounted_reward = torch.tensor(discounted_reward).float().to(DEVICE)
+        num_sets =  torch.tensor(num_sets).float().to(DEVICE)
         
         #calculate loss and do backprop
-        if hparams.model_type == 'PGNetwork':
-            prob_t = torch.stack(probs)             #create tensor of network outputs while preserving computational graph
-            logp = torch.sum(torch.log(prob_t))     #add all log probabilities in the episode
-            loss = torch.div(torch.mul(discounted_reward,logp), hparams.batch_size) #divide by number of samples (i.e. episodes in batch)
-        elif hparams.model_type == 'NoisyPG':
-            ...
-        else:
-            raise Exception('Unsupported model type.')
+        logp = torch.stack(log_ps)            #add all log probabilities in the episode
+        loss = torch.mul(discounted_reward,logp)
+        loss = torch.div(loss, hparams.batch_size) #divide by number of samples (i.e. episodes in batch)
         
-        loss.backward()
+        
+        try:
+            loss.backward()
+        except RuntimeError:
+            loss.sum().backward()
+
         #accumulate gradient over batch_size episodes
         if episode % hparams.batch_size == 0:
             opt.step()
@@ -141,14 +182,96 @@ def train(hparams, model):
         writer = csv.writer(file)
         writer.writerows(training_summaries)
         
-    return best_score, best_episode
+    return model, (best_score, best_episode)
 
+
+
+def evaluate(hparams, model,game):
+    #Initialize FB environment   
+    game.init()
+
+    with open(os.path.join(PATH,'output.txt'),'a') as f:
+        f.write(f'commencing evaluation\n')
+    print(f'commencing evaluation',flush=True)
+
+    game.reset_game()
+        
+    agent_score,num_pipes = 0,0
+    frames = []
+    lastFrame = np.zeros([WIDTH,HEIGHT],dtype=float)
+    f = 0    
+    #play a single game
+    while not game.game_over():
+        f+=1
+        #retrieve current game state in RGB for movie-making
+        prettyFrame = game.getScreenRGB()
+        plt.imsave(os.path.join(FRAMES,f'evaluate_{f}.png'),prettyFrame)
+        
+        #retrieve current game state and process into tensor
+        currentFrame = game.getScreenGrayscale()
+        frame_np = currentFrame[:,:400]
+        frame_np = frame_np[::4,::4]
+        norm_np = (frame_np-frame_np.mean())/(frame_np.std()+np.finfo(float).eps)
+        
+        #choose the appropriate model and get our action
+        if 'PGN' in hparams.model_type.upper():
+            combined_np = norm_np.ravel()
+            # plt.imshow(combined_np.reshape(WIDTH,HEIGHT))
+            frame_t = torch.from_numpy(combined_np).float().to(DEVICE)     #convert to a tensor
+            p = model.evaluate(frame_t) if hparams.dropout != 0. else model(frame_t)
+        elif 'CNN' in hparams.model_type.upper():
+            # frame_stack = np.stack([norm_np,lastFrame],0)
+            # processed = np.concatenate([utils.processScreen(frame_stack,frame_mean,frame_std),np.zeros((WIDTH,HEIGHT,1))],2)
+            # plt.imshow(processed)
+            frame_t = torch.from_numpy(norm_np.reshape([1,WIDTH,HEIGHT])).float().to(DEVICE)
+            p = model.evaluate(frame_t) if hparams.dropout != 0. else model(frame_t)
+        else:
+            raise Exception('Unsupported model type.')     
+
+        #get the action to take
+        action = 1 if p >= .5 else 0
+        
+        #take the action
+        reward = game.act(ACTION_MAP['flap'] if action==1 else ACTION_MAP['noop'])
+        agent_score += reward
+            
+        #record data for this step
+        if reward > 0:
+            num_pipes += 1
+            frames.append(currentFrame)
+    return num_pipes
+
+    
 
 #############   Main
+FLAPPYBIRD = FlappyBird(pipe_gap=GAP, rngSeed=hparams.seed)
+game = PLE(FLAPPYBIRD, display_screen=hparams.render, force_fps=True, rng=hparams.seed, reward_values=REWARDDICT)
 
-model = models.PGNetwork(GRID_SIZE,hparams.hidden,OUTPUT,hparams.leaky).to(DEVICE)
-best_score, best_episode = train(hparams,model)
-print(f'\ntraining completed\nbest score: {best_score} achieved at episode {best_episode}')
 
-with open(PATH+'/digest.txt','w') as f:
-    f.write(f'best episode:{best_episode}\nbest score: {best_score}')
+#train a model
+if 'PGN' in hparams.model_type.upper():
+    model = models.PGNetwork(hparams,GRID_SIZE,OUTPUT,DEVICE).to(DEVICE)
+elif 'CNN' in hparams.model_type.upper():
+    model = models.CNN_PG(hparams, w=WIDTH, h=HEIGHT, outputSize=OUTPUT,DEVICE=DEVICE).to(DEVICE)
+else:
+    raise Exception('Unsupported model type.')  
+
+#evaulate the model resulting from full training length
+lastModel, (best_score, best_episode) = train(hparams,model,game)
+with open(os.path.join(PATH,'output.txt'),'a') as f:
+    f.write(f'\ntraining completed\nbest score: {best_score} achieved at episode {best_episode}\n\nbeginning evaluation\n')
+print(f'\ntraining completed\nbest score: {best_score} achieved at episode {best_episode}\n\nbeginning evaluation\n',flush=True)
+
+#attempt to evaluate the best overall model from training
+try:
+    model.load_state_dict(torch.load(os.path.join(PATH,'best_model.pt')))
+    game = FLAPPYBIRD = FlappyBird(pipe_gap=GAP, rngSeed=hparams.seed+10)
+    game = PLE(FLAPPYBIRD, display_screen=hparams.render, force_fps=True, rng=hparams.seed+10, reward_values=REWARDDICT)
+    num_pipes = evaluate(hparams,model,game)
+    with open(os.path.join(PATH,'output.txt'),'a') as f:
+        f.write(f'\nevaluation completed\nscore: {num_pipes}\n')
+except Exception as e:
+    print(e)
+    with open(PATH+'/output.txt','w') as f:
+        f.write(f'Unable to load best model\n')
+

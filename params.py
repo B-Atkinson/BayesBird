@@ -23,7 +23,6 @@
 import argparse
 import os
 import yaml
-import time
 
 
 def make_argparser():
@@ -36,43 +35,59 @@ def make_argparser():
     
     
     #hyperparameters
-    parser.add_argument('--batch_size', type=int, default=20,
+    parser.add_argument('--batch_size', type=int, default=10,
                         help="number of episodes to conduct rmsprop parameter updates over")
-    parser.add_argument('--dropout', type=float, default=0,
+    parser.add_argument('--cells', type=int, default=2,
+                        help="number of Conv2d-BatchNorm-ReLu cells to use in CNN_PG")
+    parser.add_argument('--dropout', type=float, default=0.5,
                         help="likelihood of a neuron to be dropped, as a decimal from [0,1)")
     parser.add_argument('--gamma', type=float, default=.99)
-    parser.add_argument('--hidden', type=int, default=200,
-                        help="the number of hidden nodes to use in the network")
+    parser.add_argument('--hidden', type=int, default=300,
+                        help="the number of hidden nodes to use in each hidden layer of the network")
+    parser.add_argument('--init_method', type=str, default='He_normal',
+                        help='specify if weights should be initialized Xavier_uniform, Xavier_normal, He_uniform, or He_normal initialization')
     parser.add_argument('--leaky', type=str2bool, default=False,
                         help="if True, use Leaky ReLu activation, else use ReLU")
-    parser.add_argument("--learning_rate", type=float, default=1e-2,
+    parser.add_argument("--learning_rate", type=float, default=1e-4,
                         help="specify the base learning rate for the model")
-    parser.add_argument('--L2', type=float, default=0,
+    parser.add_argument('--L2', type=float, default=0.,
                         help='amount to decay weights for L2 penalty in Adam')
+    parser.add_argument('--num_hiddens', type=int, default=3,
+                        help="number of hidden fully connected layers to use in PG_Network")     
     parser.add_argument('--optim', type=str, default='Adam',
                         help='String specifying the type of optimizer to be used.')
-    parser.add_argument('--sigmoid', type=str2bool, default=False,
+    parser.add_argument('--sigmoid', type=str2bool, default=True,
                         help="if True, uses sigmoid activation for output layer of network")
+    parser.add_argument('--softmax', type=str2bool, default=False,
+                        help="if True, uses softmax activation for output layer of network")
     parser.add_argument("--temperature", type=float, default=1,
                         help="the temperature value used to modify input to the sigmoid activation \
                             function. must be greater than 0")
     
     
     #training arguments
+    parser.add_argument('--discount_vector', type=str2bool, default=True,
+                        help="if True, the agent is passed an array of discounted rewards; and a single scalar discounted reward if False")
+    parser.add_argument('--dropout_type', type=str, default='Gauss',
+                        help="choose if Gaussian or Bernoulli dropout is used")
     parser.add_argument('--maximize', type=str2bool, default=True,\
                         help="if True, Adam will maximize the objective function. Not implemented for RMSprop")
     parser.add_argument('--model_type', type=str, default='PGNetwork',
-                        help="can be PGNetwork or NoisyPG")
-    parser.add_argument('--num_episodes', type=int, default=10000,
+                        help="can be PGNetwork or CNN")
+    parser.add_argument('--num_episodes', type=int, default=20,
                         help="the number of episodes to train the agent on")
     parser.add_argument('--save_stats', type=int, default=200,
                         help="specifies the number of episodes to wait until saving network parameters, training summaries, and moves")
+    parser.add_argument('--screenHeight', type=int, default=100,
+                        help="size of post-processed screen, default 100 is downsampled 4x")
+    parser.add_argument('--screenWidth', type=int, default=72,
+                        help="size of post-processed screen, default 72 is downsampled 4x")
     parser.add_argument('--seed', type=int, default=1,
                         help="specify a number to seed the PRNGs with")
     
     
     #filepath arguments
-    parser.add_argument('--output_dir', type=str, default=os.path.join(os.getcwd(),'data/hyperSearch/'+'test_L2'),
+    parser.add_argument('--output_dir', type=str, default=os.path.join(os.getcwd(),'data/debug/'),
                         help='a filepath to an existing directory to save to')
     
     # multi-gpu training arguments
