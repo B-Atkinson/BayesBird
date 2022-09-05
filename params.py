@@ -35,11 +35,11 @@ def make_argparser():
     
     
     #hyperparameters
-    parser.add_argument('--batch_size', type=int, default=10,
+    parser.add_argument('--batch_size', type=int, default=50,
                         help="number of episodes to conduct rmsprop parameter updates over")
     parser.add_argument('--cells', type=int, default=2,
                         help="number of Conv2d-BatchNorm-ReLu cells to use in CNN_PG")
-    parser.add_argument('--dropout', type=float, default=0.5,
+    parser.add_argument('--dropout', type=float, default=0.,
                         help="likelihood of a neuron to be dropped, as a decimal from [0,1)")
     parser.add_argument('--gamma', type=float, default=.99)
     parser.add_argument('--hidden', type=int, default=300,
