@@ -115,6 +115,26 @@ def train(hparams, model,game):
             else:
                 raise Exception('Unsupported model type.')         
 
+            #get human action augmentation with potentially decayed human influence
+            if hparams.human_influence > 0.:
+                hInfluence = (hparams.human_influence * (hparams.human_decay ** episode)) if hparams.human_decay else hparams.human_influence
+                state = game.getGameState()
+                if state['next_pipe_dist_to_player']<=80:
+                    if state['player_y'] >(state['next_pipe_bottom_y']-32):
+                        #flap if player is in line or below the bottom edge of the gap
+                        p += hInfluence
+                        if p > 1:
+                            #ensure probability never goes above 1 without destroying gradient info
+                            p -= (p-1)
+                    else:
+                        #otherwise enforce going down
+                        p -= hInfluence
+                        if 0 > p:
+                            #ensure probability never dips below 0 without destroying gradient info
+                            p -= p
+            
+
+
             #get the action to take
             if hparams.dropout == 0.:
                 dist = torch.distributions.bernoulli.Bernoulli(p)

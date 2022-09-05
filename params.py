@@ -39,11 +39,15 @@ def make_argparser():
                         help="number of episodes to conduct rmsprop parameter updates over")
     parser.add_argument('--cells', type=int, default=2,
                         help="number of Conv2d-BatchNorm-ReLu cells to use in CNN_PG")
-    parser.add_argument('--dropout', type=float, default=0.5,
+    parser.add_argument('--dropout', type=float, default=0.,
                         help="likelihood of a neuron to be dropped, as a decimal from [0,1)")
     parser.add_argument('--gamma', type=float, default=.99)
     parser.add_argument('--hidden', type=int, default=300,
                         help="the number of hidden nodes to use in each hidden layer of the network")
+    parser.add_argument('--human_decay', type=float, default=0.,
+                        help="amount that the human heuristic exponentially decreases over training")
+    parser.add_argument('--human_influence', type=float, default=0.,
+                        help="amount that the human heuristic influences action probability; default of 0. means no human help (i.e. baseline)")
     parser.add_argument('--init_method', type=str, default='He_normal',
                         help='specify if weights should be initialized Xavier_uniform, Xavier_normal, He_uniform, or He_normal initialization')
     parser.add_argument('--leaky', type=str2bool, default=False,
