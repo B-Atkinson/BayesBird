@@ -145,3 +145,5 @@ data/PGNetwork-S1-Layers2-/bestFrames.p
 **/ple/games/flappybird/__pycache__/__init__.cpython-39.pyc
 plot.py
 bestScore.py
+data/debug/PGNetwork/best_model.pt
+**/best_model.pt
