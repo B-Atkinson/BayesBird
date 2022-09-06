@@ -35,7 +35,7 @@ def make_argparser():
     
     
     #hyperparameters
-    parser.add_argument('--batch_size', type=int, default=10,
+    parser.add_argument('--batch_size', type=int, default=50,
                         help="number of episodes to conduct rmsprop parameter updates over")
     parser.add_argument('--cells', type=int, default=2,
                         help="number of Conv2d-BatchNorm-ReLu cells to use in CNN_PG")
@@ -56,7 +56,7 @@ def make_argparser():
                         help="specify the base learning rate for the model")
     parser.add_argument('--L2', type=float, default=0.,
                         help='amount to decay weights for L2 penalty in Adam')
-    parser.add_argument('--num_hiddens', type=int, default=3,
+    parser.add_argument('--num_hiddens', type=int, default=2,
                         help="number of hidden fully connected layers to use in PG_Network")     
     parser.add_argument('--optim', type=str, default='Adam',
                         help='String specifying the type of optimizer to be used.')
