@@ -129,6 +129,7 @@ dir = '/home/brian.atkinson/Bayes/data/ShallowTest/PGNetwork'
 # print('done simulating play')
 
 #save numpy arrays to png for later flipping
+global movieFrameDir
 movieFrameDir = os.path.join(dir,f'movieFrames')
 # os.makedirs(movieFrameDir,exist_ok=False)
 # for i in range(len(prettyFrames)):
@@ -155,8 +156,12 @@ FFMpegWriter = manimation.writers['ffmpeg']
 metadata = dict(title=movie_title, artist='atkinson', comment='Bayes-Bird')
 writer = FFMpegWriter(fps=8, metadata=metadata)
 
-# f = plt.figure(figsize=[6, 6*1.39], dpi=resolution)
-f = plt.figure(dpi=resolution)
+f = plt.figure(figsize=[6, 6*1.39], dpi=resolution)
+
+
+
+f = plt.figure(figsize=[6, 6*1.39], dpi=resolution)
+# f = plt.figure(dpi=resolution)
 with writer.saving(f,dir + f'/{movie_title}', resolution):
     for i in range(numFrames):
         frame = plt.imread(movieFrameDir+f'/frame{i}.png').astype('uint8')
@@ -164,5 +169,7 @@ with writer.saving(f,dir + f'/{movie_title}', resolution):
         print('no errors here')
         writer.grab_frame()
         f.clear()
+
+
 
 print('finished making movie',flush=True)
