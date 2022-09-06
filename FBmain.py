@@ -89,8 +89,6 @@ def train(hparams, model,game):
         
         agent_score, num_pipes = 0, 0
         frames, actions, rewards, probs, log_ps = [], [], [], [], []
-
-        lastFrame = np.zeros([WIDTH,HEIGHT],dtype=float)
         
         #play a single game
         while not game.game_over():
@@ -103,13 +101,9 @@ def train(hparams, model,game):
             #choose the appropriate model and get our action
             if 'PGN' in hparams.model_type.upper():
                 combined_np = norm_np.ravel()
-                # plt.imshow(combined_np.reshape(WIDTH,HEIGHT))
                 frame_t = torch.from_numpy(combined_np).float().to(DEVICE)     #convert to a tensor
                 p = model(frame_t)
             elif 'CNN' in hparams.model_type.upper():
-                # frame_stack = np.stack([norm_np,lastFrame],0)
-                # processed = np.concatenate([utils.processScreen(frame_stack,frame_mean,frame_std),np.zeros((WIDTH,HEIGHT,1))],2)
-                # plt.imshow(processed)
                 frame_t = torch.from_numpy(norm_np.reshape([1,WIDTH,HEIGHT])).float().to(DEVICE)
                 p = model(frame_t)
             else:
@@ -133,8 +127,6 @@ def train(hparams, model,game):
                             #ensure probability never dips below 0 without destroying gradient info
                             p -= p
             
-
-
             #get the action to take
             if hparams.dropout == 0.:
                 dist = torch.distributions.bernoulli.Bernoulli(p)
@@ -218,7 +210,6 @@ def evaluate(hparams, model,game):
         
     agent_score,num_pipes = 0,0
     frames = []
-    lastFrame = np.zeros([WIDTH,HEIGHT],dtype=float)
     f = 0    
     #play a single game
     while not game.game_over():
@@ -236,13 +227,9 @@ def evaluate(hparams, model,game):
         #choose the appropriate model and get our action
         if 'PGN' in hparams.model_type.upper():
             combined_np = norm_np.ravel()
-            # plt.imshow(combined_np.reshape(WIDTH,HEIGHT))
             frame_t = torch.from_numpy(combined_np).float().to(DEVICE)     #convert to a tensor
             p = model.evaluate(frame_t) if hparams.dropout != 0. else model(frame_t)
         elif 'CNN' in hparams.model_type.upper():
-            # frame_stack = np.stack([norm_np,lastFrame],0)
-            # processed = np.concatenate([utils.processScreen(frame_stack,frame_mean,frame_std),np.zeros((WIDTH,HEIGHT,1))],2)
-            # plt.imshow(processed)
             frame_t = torch.from_numpy(norm_np.reshape([1,WIDTH,HEIGHT])).float().to(DEVICE)
             p = model.evaluate(frame_t) if hparams.dropout != 0. else model(frame_t)
         else:
@@ -265,7 +252,7 @@ def evaluate(hparams, model,game):
 
 #############   Main
 FLAPPYBIRD = FlappyBird(pipe_gap=GAP, rngSeed=hparams.seed)
-game = PLE(FLAPPYBIRD, display_screen=hparams.render, force_fps=True, rng=hparams.seed, reward_values=REWARDDICT)
+game = PLE(FLAPPYBIRD, display_screen=False, force_fps=True, rng=hparams.seed, reward_values=REWARDDICT)
 
 
 #train a model
@@ -286,7 +273,7 @@ print(f'\ntraining completed\nbest score: {best_score} achieved at episode {best
 try:
     model.load_state_dict(torch.load(os.path.join(PATH,'best_model.pt')))
     game = FLAPPYBIRD = FlappyBird(pipe_gap=GAP, rngSeed=hparams.seed+10)
-    game = PLE(FLAPPYBIRD, display_screen=hparams.render, force_fps=True, rng=hparams.seed+10, reward_values=REWARDDICT)
+    game = PLE(FLAPPYBIRD, display_screen=hparams.render, force_fps=not hparams.render, rng=hparams.seed+10, reward_values=REWARDDICT)
     num_pipes = evaluate(hparams,model,game)
     with open(os.path.join(PATH,'output.txt'),'a') as f:
         f.write(f'\nevaluation completed\nscore: {num_pipes}\n')
