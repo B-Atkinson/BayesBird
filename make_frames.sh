@@ -3,6 +3,7 @@
 #SBATCH --partition=beards
 #SBATCH --gres=gpu:1
 #SBATCH --time=00-02:00:00
+#SBATCH --output=/home/brian.atkinson/Bayes/text_files/movieframes_%j.txt
 
 . /etc/profile
 
