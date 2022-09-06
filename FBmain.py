@@ -120,7 +120,7 @@ def train(hparams, model,game):
                 log_ps.append(logp)
             else:
                 action = 1 if p >= .5 else 0
-                logp = torch.log( p if action==1 else 1-p  )
+                logp = torch.log( p if action==1 else 1-p )
                 log_ps.append(logp)
             
             #take the action
@@ -242,7 +242,7 @@ def evaluate(hparams, model,game):
 
 #############   Main
 FLAPPYBIRD = FlappyBird(pipe_gap=GAP, rngSeed=hparams.seed)
-game = PLE(FLAPPYBIRD, display_screen=hparams.render, force_fps=True, rng=hparams.seed, reward_values=REWARDDICT)
+game = PLE(FLAPPYBIRD, display_screen=False, force_fps=True, rng=hparams.seed, reward_values=REWARDDICT)
 
 
 #train a model
@@ -263,7 +263,7 @@ print(f'\ntraining completed\nbest score: {best_score} achieved at episode {best
 try:
     model.load_state_dict(torch.load(os.path.join(PATH,'best_model.pt')))
     game = FLAPPYBIRD = FlappyBird(pipe_gap=GAP, rngSeed=hparams.seed+10)
-    game = PLE(FLAPPYBIRD, display_screen=hparams.render, force_fps=True, rng=hparams.seed+10, reward_values=REWARDDICT)
+    game = PLE(FLAPPYBIRD, display_screen=hparams.render, force_fps=not hparams.render, rng=hparams.seed+10, reward_values=REWARDDICT)
     num_pipes = evaluate(hparams,model,game)
     with open(os.path.join(PATH,'output.txt'),'a') as f:
         f.write(f'\nevaluation completed\nscore: {num_pipes}\n')
