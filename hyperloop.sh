@@ -1,7 +1,7 @@
 #!/bin/bash
 OUTPUT=/home/brian.atkinson/Bayes/data/HumanHyperSearch/
 echo -e "saving experiment to:\n$OUTPUT\n"
-NUM_EPS=100000
+NUM_EPS=50000
 SEED=1
 
 JOB=1
