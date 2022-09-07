@@ -44,7 +44,11 @@ GAP = 150
 ACTION_MAP = {'flap': K_w,'noop': None}
 REWARDDICT = {"positive":1, "loss":-1}
 OUTPUT = 2 if hparams.softmax else 1
-PATH = hparams.output_dir + hparams.model_type
+
+PATH = hparams.output_dir + f'Human_{hparams.human_influence}-' if hparams.human_influence>0. else '' + \
+    f'Decay_{hparams.human_decay}' if hparams.human_influence >0. else '' + \
+    f'Seed_{hparams.seed}'
+
 PATH, STATS, FRAMES = utils.build_directories(PATH)
 
 with open(os.path.join(PATH,'output.txt'),'w') as f:
