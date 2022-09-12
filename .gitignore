@@ -147,3 +147,7 @@ plot.py
 bestScore.py
 data/debug/PGNetwork/best_model.pt
 **/best_model.pt
+**/stats.csv
+Seed_1-GapSize_150-00643/stats.csv
+Seed_2-GapSize_150-97584/stats.csv
+**/data/**
