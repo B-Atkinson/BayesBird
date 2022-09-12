@@ -45,9 +45,9 @@ ACTION_MAP = {'flap': K_w,'noop': None}
 REWARDDICT = {"positive":1, "loss":-1}
 OUTPUT = 2 if hparams.softmax else 1
 
-PATH = hparams.output_dir + f'Human_{hparams.human_influence}-' if hparams.human_influence>0. else 'Base-' + \
-    f'Decay_{hparams.human_decay}-' if hparams.human_influence >0. else '' + \
-    f'Seed_{hparams.seed}-' + f'GapSize_{GAP}'
+P1 = f'Human_{hparams.human_influence}-' if hparams.human_influence != 0. else 'Base-'
+P2 = f'Decay_{hparams.human_decay}-' if hparams.human_influence != 0. else ''
+PATH = hparams.output_dir + P1 + P2 + f'Seed_{hparams.seed}-' + f'GapSize_{GAP}'
 
 PATH, STATS, FRAMES = utils.build_directories(PATH)
 
@@ -117,19 +117,36 @@ def train(hparams, model,game):
             if hparams.human_influence > 0.:
                 hInfluence = torch.tensor((hparams.human_influence * (hparams.human_decay ** episode)) if hparams.human_decay else hparams.human_influence)
                 state = game.getGameState()
-                if state['next_pipe_dist_to_player']<=80:
-                    if state['player_y'] >(state['next_pipe_bottom_y']-32):
-                        #flap if player is in line or below the bottom edge of the gap
-                        p = torch.add(p, hInfluence)
-                        if p > 1:
-                            #ensure probability never goes above 1 without destroying gradient info
-                            p = torch.sub(p,torch.tensor(1.))
-                    else:
-                        #otherwise enforce going down
-                        p = torch.sub(p, hInfluence)
-                        if 0 > p:
-                            #ensure probability never dips below 0 without destroying gradient info
-                            p = torch.sub(p,p)
+                if not hparams.orig_heuristic:
+                    #treat human augmentation as a fixed probability amount
+                    if state['next_pipe_dist_to_player']<=80:
+                        if state['player_y'] >(state['next_pipe_bottom_y']-32):
+                            #flap if player is in line or below the bottom edge of the gap
+                            p = torch.add(p, hInfluence)
+                            if p > 1:
+                                #ensure probability never goes above 1 without destroying gradient info
+                                p = torch.sub(p,torch.tensor(1.))
+                        else:
+                            #otherwise enforce going down
+                            p = torch.sub(p, hInfluence)
+                            if 0 > p:
+                                #ensure probability never dips below 0 without destroying gradient info
+                                p = torch.sub(p,p)
+                else:
+                    #treat human augmentation as a percentage of network-outputted probability
+                    if state['next_pipe_dist_to_player']<=80:
+                        if state['player_y'] >(state['next_pipe_bottom_y']-32):
+                            #flap if player is in line or below the bottom edge of the gap
+                            p = torch.add(p, torch.mul(p,hInfluence))
+                            if p > 1:
+                                #ensure probability never goes above 1 without destroying gradient info
+                                p = torch.sub(p,torch.tensor(1.))
+                        else:
+                            #otherwise enforce going down
+                            p = torch.sub(p, torch.mul(p,hInfluence))
+                            if 0 > p:
+                                #ensure probability never dips below 0 without destroying gradient info
+                                p = torch.sub(p,p)
             
             #get the action to take
             if hparams.dropout == 0.:
