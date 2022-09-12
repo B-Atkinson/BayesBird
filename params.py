@@ -60,6 +60,8 @@ def make_argparser():
                         help="number of hidden fully connected layers to use in PG_Network")     
     parser.add_argument('--optim', type=str, default='Adam',
                         help='String specifying the type of optimizer to be used.')
+    parser.add_argument('--orig_heuristic', type=str2bool, default=True,
+                        help="if True, human augmentation is a percentage of network output, if False human augmentation is a fixed amount")                        
     parser.add_argument('--sigmoid', type=str2bool, default=True,
                         help="if True, uses sigmoid activation for output layer of network")
     parser.add_argument('--softmax', type=str2bool, default=False,

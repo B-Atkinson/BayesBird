@@ -1,19 +1,22 @@
 #!/bin/bash
-OUTPUT=/home/brian.atkinson/Bayes/data/HumanHyperSearch/
+OUTPUT=/home/brian.atkinson/Bayes/data/HeeHyperTest/
 echo -e "saving experiment to:\n$OUTPUT\n"
-NUM_EPS=50000
-SEED=1
+NUM_EPS=100000
+HDECAY=1
 
 JOB=1
-for INF in .1 .15 .2
+for SEED in 1 2 3
 do
-    for HDECAY in 0 .9 .95
+    for INF in 0 .15
     do
-        sbatch --job-name=$JOB \
-        --export=ALL,OUTPUT=$OUTPUT,NUM_EPS=$NUM_EPS,SEED=$SEED,INF=$INF,HDECAY=$HDECAY \
-        --output=/home/brian.atkinson/Bayes/text_files/H$SEED-Inf$INF-Dec$HDECAY.txt \
-        submit.sh
-        let JOB=JOB+1
+        for ORIG in true
+        do
+            sbatch --job-name=$JOB \
+            --export=ALL,OUTPUT=$OUTPUT,NUM_EPS=$NUM_EPS,SEED=$SEED,INF=$INF,HDECAY=$HDECAY,ORIG=$ORIG \
+            --output=/home/brian.atkinson/Bayes/text_files/H$SEED-Inf$INF-Dec$HDECAY.txt \
+            submit.sh
+            let JOB=JOB+1
+        done
     done
 done
 

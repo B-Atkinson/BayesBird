@@ -2,7 +2,7 @@
 #SBATCH --mem=2G
 #SBATCH --partition=beards
 #SBATCH --gres=gpu:1
-#SBATCH --time=01-12:00:00
+#SBATCH --time=02-00:00:00
 
 . /etc/profile
 
@@ -18,4 +18,5 @@ python FBmain.py \
 --output_dir=$OUTPUT \
 --num_episodes=$NUM_EPS \
 --human_decay=$HDECAY \
---human_influence=$INF
+--human_influence=$INF \
+--orig_heuristic=$ORIG
