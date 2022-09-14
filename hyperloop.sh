@@ -3,7 +3,7 @@ OUT=HeeHyperTest
 OUTPUT=/home/brian.atkinson/Bayes/data/$OUT/
 echo -e "saving experiment to:\n$OUTPUT\n"
 NUM_EPS=100000
-HDECAY=1
+HDECAY=0
 
 JOB=1
 for SEED in 1 2 3
